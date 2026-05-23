@@ -3,451 +3,293 @@
 <head>
 <meta charset="utf-8">
 <title>Little Radar</title>
-
 <style>
 
-/* ==================================================
-RESET
-================================================== */
+/* ── RESET ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-*{
-  box-sizing:border-box;
-  margin:0;
-  padding:0;
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: #031009;
+  color: #D7FFE9;
+  font-family: Arial, sans-serif;
 }
 
-html,
-body{
-  width:100%;
-  height:100%;
-
-  overflow:hidden;
-
-  background:#031009;
-
-  color:#D7FFE9;
-
-  font-family:Arial;
+/* ── ROOT LAYOUT ──
+   Portrait/desktop default: radar area left, info panel right (260px).
+   Landscape and tiny overrides below. */
+.app {
+  width: 100vw;
+  height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  overflow: hidden;
 }
 
-/* ==================================================
-ROOT APP
-================================================== */
-
-.app{
-
-  width:100vw;
-
-  height:100vh;
-
-  display:grid;
-
-  grid-template-columns:
-    minmax(0,1fr)
-    260px;
-
-  overflow:hidden;
+/* ── LEFT COLUMN ──
+   Uses a grid so title/controls each take exactly their natural height
+   and the radar row gets whatever remains — preventing the disc from
+   ever squashing the controls bar above it. */
+.left {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  padding: 12px;
+  gap: 10px;
+  min-width: 0;
+  min-height: 0;
 }
 
-/* ==================================================
-LEFT SIDE
-================================================== */
+h1 { font-size: 42px; }
 
-.left{
-
-  display:flex;
-
-  flex-direction:column;
-
-  padding:12px;
-
-  min-width:0;
-
-  overflow:hidden;
+/* ── CONTROLS ── */
+.controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
 }
 
-h1{
-
-  font-size:42px;
-
-  margin-bottom:12px;
+button, input {
+  padding: 8px 14px;
+  border-radius: 12px;
+  font-size: 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  border: 1px solid #58FFAF;
 }
 
-/* ==================================================
-CONTROLS
-================================================== */
+button              { background: #11231B; color: #58FFAF; }
+button:hover        { background: #1a3328; }
+button.active       { background: #58FFAF; color: #031009; }
+button.action       { background: #58FFAF; color: #031009; }
+button.action:hover { background: #3ddda0; }
+input { width: 74px; background: #11231B; color: white; border-color: #1e3d2e; }
 
-.controls{
-
-  display:flex;
-
-  gap:10px;
-
-  margin-bottom:14px;
-
-  flex-wrap:wrap;
+/* ── RADAR DISC ──
+   aspect-ratio:1 keeps it square.
+   max-height:100% + align/justify-self:center means it fills the grid
+   cell but never overflows it — curing the "bottom half cut off" bug.
+   overflow:hidden clips the canvas/sweep to the circle. */
+.radar {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  aspect-ratio: 1 / 1;
+  align-self: center;
+  justify-self: center;
+  position: relative;
+  border-radius: 50%;
+  overflow: hidden;
+  background: radial-gradient(circle, rgba(0,255,140,.03), transparent), #04120A;
 }
 
-button,
-input{
-
-  padding:10px 12px;
-
-  border:none;
-
-  border-radius:12px;
-
-  font-size:14px;
+/* Map canvas — lowest layer inside the disc */
+#mapCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 1s ease;
 }
 
-button{
+/* Crosshairs */
+.cross  { position: absolute; left: 50%; top: 0;   width: 1px;  height: 100%; background: rgba(100,255,180,.25); z-index: 2; }
+.cross2 { position: absolute; left: 0;   top: 50%; width: 100%; height: 1px;  background: rgba(100,255,180,.25); z-index: 2; }
 
-  background:#58FFAF;
-
-  color:black;
-
-  cursor:pointer;
+/* Range rings */
+.ring {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(100,255,180,.25);
+  border-radius: 50%;
+  z-index: 2;
 }
 
-input{
-
-  width:80px;
-
-  background:#11231B;
-
-  color:white;
+.ringLabel {
+  position: absolute;
+  bottom: 14%; right: 6%;
+  font-size: 12px;
+  color: #8FFFBD;
+  padding: 2px 8px;
+  background: rgba(0,0,0,.6);
+  border-radius: 10px;
+  white-space: nowrap;
+  pointer-events: none;
 }
 
-/* ==================================================
-RADAR
-================================================== */
+/* Rotating sweep */
+.sweep {
+  position: absolute; inset: 0;
+  background: conic-gradient(rgba(88,255,175,.22), transparent 55deg);
+  animation: spin 4s linear infinite;
+  z-index: 3;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
 
-.radar{
-
-  flex:1;
-
-  width:100%;
-
-  min-width:0;
-
-  min-height:0;
-
-  max-width:100%;
-
-  aspect-ratio:1;
-
-  margin:auto;
-
-  position:relative;
-
-  border-radius:50%;
-
-  overflow:hidden;
-
-  background:
-    radial-gradient(
-      circle,
-      rgba(0,255,140,.03),
-      rgba(0,0,0,0)
-    ),
-    #04120A;
+/* Centre dot */
+.center {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 14px; height: 14px;
+  background: #58FFAF;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 5;
 }
 
-.cross{
-
-  position:absolute;
-
-  left:50%;
-
-  top:0;
-
-  width:1px;
-
-  height:100%;
-
-  background:
-    rgba(100,255,180,.25);
+/* Cardinal labels */
+.dir {
+  position: absolute;
+  font-size: 20px;
+  font-weight: 700;
+  color: #7FFFBE;
+  z-index: 5;
 }
 
-.cross2{
-
-  position:absolute;
-
-  left:0;
-
-  top:50%;
-
-  width:100%;
-
-  height:1px;
-
-  background:
-    rgba(100,255,180,.25);
+/* Aircraft dots */
+.dot {
+  position: absolute;
+  width: 12px; height: 12px;
+  background: #58FFAF;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 18px #58FFAF;
+  z-index: 6;
 }
 
-.ring{
-
-  position:absolute;
-
-  left:50%;
-
-  top:50%;
-
-  transform:
-    translate(-50%,-50%);
-
-  border:
-    1px solid rgba(100,255,180,.25);
-
-  border-radius:50%;
+/* Callsign label */
+.label {
+  position: absolute;
+  left: 14px; top: -8px;
+  font-size: 14px;
+  line-height: 1.3;
+  white-space: nowrap;
+  color: #D7FFE9;
+  background: rgba(0,0,0,.5);
+  padding: 1px 5px;
+  border-radius: 5px;
+  pointer-events: none;
 }
 
-.ringLabel{
-
-  position:absolute;
-
-  bottom:8px;
-
-  right:8px;
-
-  font-size:12px;
-
-  color:#8FFFBD;
-
-  padding:2px 8px;
-
-  background:
-    rgba(0,0,0,.45);
-
-  border-radius:10px;
+/* ── RIGHT PANEL ── */
+.panel {
+  background: #091711;
+  padding: 12px;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
-.sweep{
-
-  position:absolute;
-
-  inset:0;
-
-  background:
-    conic-gradient(
-      rgba(88,255,175,.22),
-      transparent 55deg
-    );
-
-  animation:
-    spin 4s linear infinite;
+.card {
+  background: #10221A;
+  padding: 10px;
+  margin-bottom: 10px;
+  border-radius: 10px;
 }
 
-@keyframes spin{
+.small { color: #8DB39C; font-size: 13px; }
 
-  to{
 
-    transform:
-      rotate(360deg);
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   LANDSCAPE (≥601px wide)
+   .left becomes a flex column: preset buttons on top, then the radar
+   disc fills all remaining height. Panel gets 20% of screen width.
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+@media screen and (orientation: landscape) and (min-width: 601px) {
 
+  .app {
+    grid-template-columns: minmax(0, 4fr) minmax(0, 1fr);
   }
 
+  /* Switch left column to flex so the disc can be sized with min() */
+  .left {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+    gap: 6px;
+  }
+
+  h1 { display: none; }
+
+  /* Only preset buttons visible in landscape; hide title/input/action btns */
+  .controls .action,
+  .controls input { display: none; }
+
+  /* Disc: largest square that fits the left column (80vw × 100vh) */
+  .radar {
+    width:  min(calc(80vw - 16px), calc(100vh - 48px));
+    height: min(calc(80vw - 16px), calc(100vh - 48px));
+    max-width:  none;
+    max-height: none;
+    flex: 0 0 auto;
+  }
+
+  .panel { display: block; }
+  .card  { padding: 8px; font-size: 13px; }
+  .small { font-size: 12px; }
+  #aircraftList { display: none; }
 }
 
-.center{
 
-  position:absolute;
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   TINY SCREEN (≤600px wide) — orb only, centred
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+@media screen and (max-width: 600px) {
 
-  left:50%;
-
-  top:50%;
-
-  width:14px;
-
-  height:14px;
-
-  background:#58FFAF;
-
-  border-radius:50%;
-
-  transform:
-    translate(-50%,-50%);
-}
-
-.dot{
-
-  position:absolute;
-
-  width:12px;
-
-  height:12px;
-
-  background:#58FFAF;
-
-  border-radius:50%;
-
-  transform:
-    translate(-50%,-50%);
-
-  box-shadow:
-    0 0 18px #58FFAF;
-}
-
-.label{
-
-  position:absolute;
-
-  left:16px;
-
-  top:-8px;
-
-  font-size:12px;
-
-  white-space:nowrap;
-}
-
-.dir{
-
-  position:absolute;
-
-  font-size:20px;
-
-  font-weight:700;
-
-  color:#7FFFBE;
-}
-
-/* ==================================================
-RIGHT PANEL
-================================================== */
-
-.panel{
-
-  background:#091711;
-
-  padding:12px;
-
-  overflow-y:auto;
-
-  overflow-x:hidden;
-}
-
-.card{
-
-  background:#10221A;
-
-  padding:10px;
-
-  margin-bottom:10px;
-
-  border-radius:10px;
-}
-
-.small{
-
-  color:#8DB39C;
-
-  font-size:13px;
-}
-
-/* ==================================================
-DESKTOP MODE
-1024 × 600
-================================================== */
-
-@media (min-width:601px){
-
-  .panel{
-    display:block;
+  .app {
+    display: flex !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    justify-content: center;
+    align-items: center;
   }
 
-  .controls{
-    display:flex;
+  /* Hide everything except the disc itself */
+  .panel, .controls, h1 { display: none !important; }
+
+  .left {
+    display: flex !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    padding: 0 !important;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
   }
 
-  h1{
-    display:block;
+  /* Disc fills the shorter viewport dimension */
+  .radar {
+    width:  min(100vw, 100vh) !important;
+    height: min(100vw, 100vh) !important;
+    max-width:  none !important;
+    max-height: none !important;
+    flex: 0 0 auto !important;
+    aspect-ratio: 1 !important;
+    margin: 0 !important;
   }
 
-}
+  /* Drop ring labels and callsigns — too cramped */
+  .ringLabel, .label { display: none !important; }
 
-/* ==================================================
-RADAR ORB MODE
-320 × 240
-================================================== */
-
-@media screen and (max-width:700px){
-
-  html,
-  body{
-    width:100vw;
-    height:100vh;
-    overflow:hidden;
+  /* Bolder cardinals for legibility on small screens */
+  .dir {
+    font-size: 16px !important;
+    font-weight: 900 !important;
+    text-shadow: 0 0 6px rgba(88,255,175,.8);
   }
 
-  .app{
-    display:flex !important;
-    width:100vw !important;
-    height:100vh !important;
-    justify-content:center;
-    align-items:center;
-    overflow:hidden;
-    background:#031009;
-  }
-
-  .panel,
-  .controls,
-  h1{
-    display:none !important;
-  }
-
-  .left{
-    width:100vw !important;
-    height:100vh !important;
-    padding:0 !important;
-    display:flex !important;
-    justify-content:center;
-    align-items:center;
-    overflow:hidden;
-  }
-
-  .radar{
-    width:min(100vw,100vh) !important;
-    height:min(100vw,100vh) !important;
-    max-width:none !important;
-    max-height:none !important;
-    min-width:0 !important;
-    min-height:0 !important;
-    flex:0 0 auto !important;
-    aspect-ratio:1 / 1 !important;
-    margin:0 !important;
-    border-radius:50%;
-  }
-
-  .label{
-    display:none !important;
-  }
-
-  .ringLabel{
-    font-size:9px;
-    padding:1px 4px;
-  }
-
-  .dir{
-    font-size:12px;
-  }
-
-  .dot{
-    width:7px;
-    height:7px;
-    box-shadow:0 0 10px #58FFAF;
-  }
-
-  .center{
-    width:8px;
-    height:8px;
-  }
+  .dot    { width: 8px; height: 8px; box-shadow: 0 0 10px #58FFAF; }
+  .center { width: 9px; height: 9px; }
 }
 
 </style>
-
 </head>
-
 <body>
 
 <div class="app">
@@ -456,28 +298,24 @@ RADAR ORB MODE
     <h1>LITTLE RADAR</h1>
 
     <div class="controls">
-      <button onclick="locate()">Use my location</button>
-      <input id="radius" value="25">
-      <button onclick="scan()">Refresh</button>
+      <button class="action" onclick="locate()">Use my location</button>
+      <button class="preset active" onclick="setRadius(25)">25 km</button>
+      <button class="preset" onclick="setRadius(50)">50 km</button>
+      <button class="preset" onclick="setRadius(100)">100 km</button>
+      <input id="radius" value="25" type="number" min="1" max="500">
+      <button class="action" onclick="scan()">Refresh</button>
     </div>
 
     <div class="radar" id="radar">
+      <canvas id="mapCanvas"></canvas>
 
       <div class="sweep"></div>
       <div class="cross"></div>
       <div class="cross2"></div>
 
-      <div class="ring" style="width:30%;height:30%;">
-        <div class="ringLabel" id="ring1">—</div>
-      </div>
-
-      <div class="ring" style="width:60%;height:60%;">
-        <div class="ringLabel" id="ring2">—</div>
-      </div>
-
-      <div class="ring" style="width:90%;height:90%;">
-        <div class="ringLabel" id="ring3">—</div>
-      </div>
+      <div class="ring" style="width:30%;height:30%;"><div class="ringLabel" id="ring1">—</div></div>
+      <div class="ring" style="width:60%;height:60%;"><div class="ringLabel" id="ring2">—</div></div>
+      <div class="ring" style="width:90%;height:90%;"><div class="ringLabel" id="ring3">—</div></div>
 
       <div class="dir" style="left:50%;top:6px;transform:translateX(-50%);">N</div>
       <div class="dir" style="right:6px;top:50%;">E</div>
@@ -485,148 +323,290 @@ RADAR ORB MODE
       <div class="dir" style="left:6px;top:50%;">W</div>
 
       <div class="center"></div>
-
     </div>
   </div>
 
   <div class="panel">
-
-    <div class="card">
-      Aircraft: <span id="count">0</span>
-    </div>
-
-    <div class="card" id="location">
-      Waiting…
-    </div>
-
-    <div class="card" id="aircraftList">
-      No aircraft
-    </div>
-
-    <div class="card" id="logs">
-      Logs
-    </div>
-
+    <div class="card">Aircraft: <span id="count">0</span></div>
+    <div class="card" id="location">Waiting…</div>
+    <div class="card" id="aircraftList">No aircraft</div>
+    <div class="card" id="logs">Logs</div>
   </div>
 
 </div>
 
 <script>
-let userLat=-34.92;
-let userLon=138.60;
+// ── State ──
+let userLat = -34.92;
+let userLon =  138.60;
 
-const radarEl=document.getElementById("radar");
-const radiusInput=document.getElementById("radius");
-const countEl=document.getElementById("count");
-const logsEl=document.getElementById("logs");
-const aircraftListEl=document.getElementById("aircraftList");
-const locationEl=document.getElementById("location");
+// Map data is always fetched at MAP_FETCH_RADIUS km so switching between
+// presets never requires a new network call — we just redraw at a different scale.
+const MAP_FETCH_RADIUS = 100;
 
-const planeMap=new Map();
+const radarEl        = document.getElementById("radar");
+const mapCanvas      = document.getElementById("mapCanvas");
+const radiusInput    = document.getElementById("radius");
+const countEl        = document.getElementById("count");
+const logsEl         = document.getElementById("logs");
+const aircraftListEl = document.getElementById("aircraftList");
+const locationEl     = document.getElementById("location");
 
-function log(msg){
+const planeMap = new Map(); // callsign → { el, lastSeen, x, y }
+
+// Raw Overpass ways cached after first fetch for the current location.
+// Reused on every radius change; only refreshed when location changes.
+let cachedWays = [];
+
+
+// ════════════════════════════════════════════════════════
+// MAP LAYER
+// ════════════════════════════════════════════════════════
+
+// Project a lat/lon to canvas pixel coordinates.
+// cLat/cLon = disc centre; radiusKm = display radius (not fetch radius).
+function geoToCanvas(lat, lon, cLat, cLon, radiusKm, size) {
+  const kmPerDegLat = 111.32;
+  const kmPerDegLon = 111.32 * Math.cos(cLat * Math.PI / 180);
+  const dy =  (lat - cLat) * kmPerDegLat;
+  const dx =  (lon - cLon) * kmPerDegLon;
+  const scale = (size * 0.45) / radiusKm; // 45% radius = outermost ring edge
+  return [
+    size / 2 + dx * scale,
+    size / 2 - dy * scale  // invert y: north = up
+  ];
+}
+
+// Draw all cached ways onto the canvas at the given display radius.
+function drawMap(ways, cLat, cLon, displayRadiusKm) {
+  const size = mapCanvas.width;
+  const ctx  = mapCanvas.getContext("2d");
+  ctx.clearRect(0, 0, size, size);
+
+  // Clip everything to the circular disc boundary
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(size / 2, size / 2, size / 2 - 1, 0, Math.PI * 2);
+  ctx.clip();
+
+  ways.forEach(way => {
+    if (!way.geometry || way.geometry.length < 2) return;
+
+    const tags        = way.tags || {};
+    const isWater     = tags.natural === "coastline" || tags.waterway ||
+                        tags.natural === "water"     || tags.natural === "bay";
+    const isMajorRoad = ["motorway","trunk","primary","secondary"].includes(tags.highway);
+    const isMinorRoad = ["tertiary","unclassified","residential"].includes(tags.highway);
+    const isBoundary  = tags.boundary === "administrative";
+
+    if      (isWater)     { ctx.strokeStyle = "rgba(88,210,255,0.35)"; ctx.lineWidth = 1.2; ctx.setLineDash([]); }
+    else if (isMajorRoad) { ctx.strokeStyle = "rgba(88,255,175,0.22)"; ctx.lineWidth = 1.0; ctx.setLineDash([]); }
+    else if (isMinorRoad) { ctx.strokeStyle = "rgba(88,255,175,0.11)"; ctx.lineWidth = 0.6; ctx.setLineDash([]); }
+    else if (isBoundary)  { ctx.strokeStyle = "rgba(88,255,175,0.14)"; ctx.lineWidth = 0.8; ctx.setLineDash([4,6]); }
+    else                  { ctx.strokeStyle = "rgba(88,255,175,0.08)"; ctx.lineWidth = 0.5; ctx.setLineDash([]); }
+
+    ctx.beginPath();
+    way.geometry.forEach((pt, i) => {
+      const [x, y] = geoToCanvas(pt.lat, pt.lon, cLat, cLon, displayRadiusKm, size);
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+  });
+
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
+// Build Overpass query. Always fetches MAP_FETCH_RADIUS (100 km) regardless
+// of which preset is selected, so zooming in/out needs no re-fetch.
+function buildOverpassQuery(lat, lon) {
+  const r   = MAP_FETCH_RADIUS;
+  const deg = (r / 111.32) * 1.1;
+  const cosLat = Math.cos(lat * Math.PI / 180);
+  const s = lat - deg,               n = lat + deg;
+  const w = lon - deg / cosLat,      e = lon + deg / cosLat;
+  const bbox = `${s.toFixed(5)},${w.toFixed(5)},${n.toFixed(5)},${e.toFixed(5)}`;
+
+  return `[out:json][timeout:30];
+(
+  way["natural"="coastline"](${bbox});
+  way["waterway"~"river|stream|canal"](${bbox});
+  way["natural"~"water|bay"](${bbox});
+  way["highway"~"motorway|trunk|primary|secondary|tertiary|unclassified|residential"](${bbox});
+  way["boundary"="administrative"]["admin_level"~"^(6|7|8)$"](${bbox});
+);
+out geom;`;
+}
+
+// Fetch map data for the current location (always at 100 km), cache it,
+// then draw at the currently selected display radius.
+async function fetchMap(lat, lon) {
+  mapCanvas.style.opacity = "0";
+  try {
+    log("Fetching map (100 km)…");
+    const res  = await fetch("https://overpass-api.de/api/interpreter", {
+      method : "POST",
+      body   : buildOverpassQuery(lat, lon),
+      headers: { "Content-Type": "text/plain" }
+    });
+    const data = await res.json();
+    cachedWays = data.elements;
+    redrawMap();
+    log("Map ready");
+  } catch (e) {
+    log("Map error: " + e.message);
+  }
+}
+
+// Redraw the canvas from the cache at whatever radius is currently active.
+// Called immediately (no network) when the user taps a preset button.
+function redrawMap() {
+  if (!cachedWays.length) return;
+  const displayRadius = Number(radiusInput.value || 25);
+  const size = radarEl.offsetWidth;
+  if (size === 0) return; // disc not yet in DOM
+  mapCanvas.width  = size;
+  mapCanvas.height = size;
+  drawMap(cachedWays, userLat, userLon, displayRadius);
+  mapCanvas.style.opacity = "1";
+}
+
+
+// ════════════════════════════════════════════════════════
+// AIRCRAFT DOTS
+// ════════════════════════════════════════════════════════
+
+function log(msg) {
   logsEl.insertAdjacentHTML(
     "afterbegin",
     `<div class="small">${new Date().toLocaleTimeString()} · ${msg}</div>`
   );
 }
 
-function getKey(p){
-  return (p.flight || "unknown").trim();
+function getKey(p) { return (p.flight || "unknown").trim(); }
+
+function createDot() {
+  const el = document.createElement("div");
+  el.className = "dot";
+  el.style.transition = "left 2s linear, top 2s linear, opacity 1s";
+  el.style.opacity = "0";
+  el.innerHTML = `<div class="label"></div>`;
+  radarEl.appendChild(el);
+  return el;
 }
 
-function createPlane(key){
-  const d=document.createElement("div");
-  d.className="dot";
-  d.style.transition="left 2s linear, top 2s linear, opacity 1s";
-  d.style.opacity="0";
-  d.innerHTML=`<div class="label"></div>`;
-  radarEl.appendChild(d);
-
-  planeMap.set(key,{
-    el:d,
-    lastSeen:Date.now()
-  });
-
-  return d;
-}
-
-function updatePlane(plane,radius){
-  const key=getKey(plane);
-
-  let obj=planeMap.get(key);
-
-  if(!obj){
-    obj={
-      el:createPlane(key),
-      lastSeen:Date.now()
-    };
+function updatePlane(plane, radius) {
+  const key = getKey(plane);
+  let obj = planeMap.get(key);
+  if (!obj) {
+    obj = { el: createDot(), lastSeen: Date.now(), x: 50, y: 50 };
+    planeMap.set(key, obj);
   }
 
-  const angle=(plane.heading || 0) * Math.PI / 180;
+  const angleRad = ((plane.heading || 0) - 90) * Math.PI / 180;
+  const r = Math.min(plane.distance / radius, 1) * 45;
 
-  const r=Math.min(plane.distance / radius,1) * 45;
+  obj.x = 50 + Math.cos(angleRad) * r;
+  obj.y = 50 + Math.sin(angleRad) * r;
+  obj.el.style.left    = obj.x + "%";
+  obj.el.style.top     = obj.y + "%";
+  obj.el.style.opacity = "1";
+  obj.el.querySelector(".label").innerHTML = `${key}<br>${Math.round(plane.distance)} km`;
 
-  const x=50 + Math.cos(angle) * r;
-  const y=50 + Math.sin(angle) * r;
-
-  obj.el.style.left=x+"%";
-  obj.el.style.top=y+"%";
-  obj.el.style.opacity="1";
-
-  obj.el.querySelector(".label").innerHTML=
-    `${key}<br>${Math.round(plane.distance)} km`;
-
-  obj.lastSeen=Date.now();
-  planeMap.set(key,obj);
+  obj.lastSeen = Date.now();
+  planeMap.set(key, obj);
 }
 
-function cleanup(){
-  const now=Date.now();
+// ── Label collision avoidance ──
 
-  planeMap.forEach((plane,key)=>{
-    if(now - plane.lastSeen > 30000){
-      plane.el.style.opacity=0;
+function resolveLabels() {
+  const entries = [...planeMap.values()].filter(o => o.el.style.opacity !== "0");
+  if (entries.length < 2) return;
 
-      setTimeout(()=>{
-        plane.el.remove();
-      },1000);
+  const { width: W, height: H } = radarEl.getBoundingClientRect();
+  const labels = entries.map(obj => {
+    const labelEl = obj.el.querySelector(".label");
+    return { labelEl,
+      lx: (obj.x / 100) * W, ly: (obj.y / 100) * H,
+      ox: 14, oy: -8,
+      lw: labelEl.offsetWidth  || 70,
+      lh: labelEl.offsetHeight || 32 };
+  });
 
+  const PAD = 6;
+  for (let pass = 0; pass < 3; pass++) {
+    for (let i = 0; i < labels.length; i++) {
+      for (let j = i + 1; j < labels.length; j++) {
+        const a = labels[i], b = labels[j];
+        const ax1 = a.lx+a.ox, ay1 = a.ly+a.oy, ax2 = ax1+a.lw, ay2 = ay1+a.lh;
+        const bx1 = b.lx+b.ox, by1 = b.ly+b.oy, bx2 = bx1+b.lw, by2 = by1+b.lh;
+        if (ax1 < bx2+PAD && ax2+PAD > bx1 && ay1 < by2+PAD && ay2+PAD > by1) {
+          const shift = (ay2 + PAD - by1) / 2;
+          a.oy -= shift; b.oy += shift;
+        }
+      }
+    }
+  }
+  labels.forEach(({ labelEl, ox, oy }) => {
+    labelEl.style.left = ox + "px";
+    labelEl.style.top  = oy + "px";
+  });
+}
+
+// ── Stale dot cleanup ──
+
+function cleanup() {
+  const now = Date.now();
+  planeMap.forEach((obj, key) => {
+    if (now - obj.lastSeen > 30000) {
+      obj.el.style.opacity = "0";
+      setTimeout(() => obj.el.remove(), 1000);
       planeMap.delete(key);
     }
   });
 }
 
-function updateScale(){
-  const radius=Number(radiusInput.value || 25);
+// ── Ring distance labels ──
 
-  document.getElementById("ring1").innerHTML=
-    `${Math.round(radius*.33)} km`;
-
-  document.getElementById("ring2").innerHTML=
-    `${Math.round(radius*.66)} km`;
-
-  document.getElementById("ring3").innerHTML=
-    `${radius} km`;
+function updateRingLabels() {
+  const r = Number(radiusInput.value || 25);
+  document.getElementById("ring1").textContent = `${Math.round(r * .33)} km`;
+  document.getElementById("ring2").textContent = `${Math.round(r * .66)} km`;
+  document.getElementById("ring3").textContent = `${r} km`;
 }
 
-async function scan(){
-  const radius=Number(radiusInput.value || 25);
+// ── Preset buttons ──
 
-  updateScale();
+function setRadius(km) {
+  radiusInput.value = km;
+  document.querySelectorAll(".preset").forEach(btn => {
+    btn.classList.toggle("active", parseInt(btn.textContent) === km);
+  });
+  updateRingLabels();
+  redrawMap(); // instant — no network call needed
+  scan();
+}
 
+radiusInput.addEventListener("input", () => {
+  document.querySelectorAll(".preset").forEach(b => b.classList.remove("active"));
+});
+
+// ── Main scan ──
+
+async function scan() {
+  const radius = Number(radiusInput.value || 25);
+  updateRingLabels();
   log(`Scanning ${radius} km`);
 
-  const planes=await fetch(
+  const planes = await fetch(
     `/planes?lat=${userLat}&lon=${userLon}&radius=${radius}`
-  ).then(r=>r.json());
+  ).then(r => r.json());
 
-  countEl.innerHTML=planes.length;
-  aircraftListEl.innerHTML="";
+  countEl.textContent = planes.length;
+  aircraftListEl.innerHTML = "";
 
-  planes.forEach(p=>{
-    updatePlane(p,radius);
-
+  planes.forEach(p => {
+    updatePlane(p, radius);
     aircraftListEl.insertAdjacentHTML(
       "beforeend",
       `<div class="small">${p.flight || "Flight"} · ${Math.round(p.distance)} km</div>`
@@ -634,30 +614,34 @@ async function scan(){
   });
 
   cleanup();
+  requestAnimationFrame(() => requestAnimationFrame(resolveLabels));
 
-  locationEl.innerHTML=
+  locationEl.innerHTML =
     `${userLat.toFixed(4)}<br>${userLon.toFixed(4)}<br>Radius: ${radius} km`;
 }
 
-function locate(){
+// ── Geolocation ──
+
+function locate() {
   navigator.geolocation.getCurrentPosition(
-    p=>{
-      userLat=p.coords.latitude;
-      userLon=p.coords.longitude;
-      log("Location ready");
+    pos => {
+      userLat = pos.coords.latitude;
+      userLon = pos.coords.longitude;
+      log("Location acquired");
+      fetchMap(userLat, userLon); // fetch map at 100 km for this location
       scan();
     },
-    err=>{
+    err => {
       log("Location error: " + err.message);
+      fetchMap(userLat, userLon);
       scan();
     }
   );
 }
 
+// ── Boot ──
 locate();
-
-setInterval(scan,15000);
+setInterval(scan, 15000);
 </script>
-
 </body>
 </html>
