@@ -1,259 +1,160 @@
 import express from "express";
-import cors from "cors";
-import fs from "fs";
+import cors    from "cors";
+import fs      from "fs";
 
 const app = express();
-
 app.use(cors());
 app.use(express.static("public"));
 
-const creds =
-JSON.parse(
-fs.readFileSync(
-"./credentials.json",
-"utf8"
-)
-);
+// ── Credentials ──────────────────────────────────────────
+const creds = JSON.parse(fs.readFileSync("./credentials.json", "utf8"));
 
-let token=null;
+// ── Token cache with expiry ───────────────────────────────
+// OpenSky tokens expire after ~1 hour. We store the expiry
+// time and refresh 60 s before it lapses, so the disc never
+// goes dark because of a stale token.
+let tokenCache = {
+  value:     null,
+  expiresAt: 0       // Unix ms
+};
 
-async function getToken(){
+async function getToken() {
+  const now = Date.now();
 
-if(token)
-return token;
+  // Return cached token if it has more than 60 s left
+  if (tokenCache.value && now < tokenCache.expiresAt - 60_000) {
+    return tokenCache.value;
+  }
 
-const body=
-new URLSearchParams({
+  console.log("Fetching new OpenSky token…");
 
-grant_type:"client_credentials",
+  const body = new URLSearchParams({
+    grant_type:    "client_credentials",
+    client_id:     creds.clientId,
+    client_secret: creds.clientSecret
+  });
 
-client_id:
-creds.clientId,
+  const r = await fetch(
+    "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token",
+    {
+      method:  "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body
+    }
+  );
 
-client_secret:
-creds.clientSecret
+  if (!r.ok) {
+    throw new Error(`Token fetch failed: ${r.status} ${r.statusText}`);
+  }
 
+  const data = await r.json();
+
+  if (!data.access_token) {
+    throw new Error("Token response contained no access_token");
+  }
+
+  // expires_in is in seconds; default to 3600 if missing
+  const expiresIn = (data.expires_in || 3600) * 1000;
+
+  tokenCache = {
+    value:     data.access_token,
+    expiresAt: now + expiresIn
+  };
+
+  console.log(`Token refreshed — expires in ${Math.round(expiresIn / 60000)} min`);
+  return tokenCache.value;
+}
+
+// ── Haversine distance (km) ───────────────────────────────
+function km(lat1, lon1, lat2, lon2) {
+  const R    = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a    = Math.sin(dLat / 2) ** 2
+             + Math.cos(lat1 * Math.PI / 180)
+             * Math.cos(lat2 * Math.PI / 180)
+             * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// ── Last known planes cache ───────────────────────────────
+// If OpenSky is unreachable or returns an error we send back
+// the most recent successful result tagged with `stale:true`
+// so the frontend can show "Last known positions".
+let lastKnown = {
+  planes:    [],
+  fetchedAt: null   // ISO string for logging
+};
+
+// ── /planes endpoint ─────────────────────────────────────
+app.get("/planes", async (req, res) => {
+  const lat    = parseFloat(req.query.lat);
+  const lon    = parseFloat(req.query.lon);
+  const radius = parseFloat(req.query.radius);
+
+  if (isNaN(lat) || isNaN(lon) || isNaN(radius)) {
+    return res.status(400).json({ error: "lat, lon and radius are required" });
+  }
+
+  console.log({ lat, lon, radius });
+
+  try {
+    const access = await getToken();
+
+    const response = await fetch(
+      "https://opensky-network.org/api/states/all",
+      { headers: { Authorization: `Bearer ${access}` } }
+    );
+
+    // A 401 means our token was rejected — clear the cache so the
+    // next request forces a fresh token fetch instead of looping.
+    if (response.status === 401) {
+      console.warn("401 from OpenSky — clearing token cache");
+      tokenCache = { value: null, expiresAt: 0 };
+      throw new Error("OpenSky returned 401 — token cleared, will retry");
+    }
+
+    if (!response.ok) {
+      throw new Error(`OpenSky returned ${response.status}`);
+    }
+
+    const data   = await response.json();
+    const nearby = [];
+
+    for (const p of data.states || []) {
+      if (!p[5] || !p[6]) continue;
+      const d = km(lat, lon, p[6], p[5]);
+      if (d <= radius) {
+        nearby.push({
+          flight:   p[1],
+          lat:      p[6],
+          lon:      p[5],
+          distance: d,
+          heading:  p[10]
+        });
+      }
+    }
+
+    console.log("Nearby:", nearby.length);
+
+    // Update the last-known cache on every successful fetch
+    lastKnown = { planes: nearby, fetchedAt: new Date().toISOString() };
+
+    res.json({ planes: nearby, stale: false });
+
+  } catch (e) {
+    // Network down, OpenSky down, or token problem —
+    // return whatever we had last so the frontend can show
+    // "Last known positions" rather than going blank.
+    console.error("Fetch error — serving last known:", e.message);
+
+    res.json({
+      planes:    lastKnown.planes,
+      stale:     true,
+      fetchedAt: lastKnown.fetchedAt
+    });
+  }
 });
 
-const r=
-
-await fetch(
-
-"https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token",
-
-{
-
-method:"POST",
-
-headers:{
-"Content-Type":
-"application/x-www-form-urlencoded"
-},
-
-body
-
-}
-
-);
-
-const data=
-await r.json();
-
-token=
-data.access_token;
-
-return token;
-
-}
-
-function km(
-lat1,
-lon1,
-lat2,
-lon2
-){
-
-const R=6371;
-
-const dLat=
-(lat2-lat1)
-*
-Math.PI
-/
-180;
-
-const dLon=
-(lon2-lon1)
-*
-Math.PI
-/
-180;
-
-const a=
-
-Math.sin(dLat/2)**2+
-
-Math.cos(
-lat1*Math.PI/180
-)
-
-*
-
-Math.cos(
-lat2*Math.PI/180
-)
-
-*
-
-Math.sin(dLon/2)**2;
-
-return R*2*Math.atan2(
-Math.sqrt(a),
-Math.sqrt(1-a)
-);
-
-}
-
-app.get("/planes",
-
-async(req,res)=>{
-
-try{
-
-const lat=
-parseFloat(
-req.query.lat
-);
-
-const lon=
-parseFloat(
-req.query.lon
-);
-
-const radius=
-parseFloat(
-req.query.radius
-);
-
-console.log(
-{
-lat,
-lon,
-radius
-}
-);
-
-const access=
-await getToken();
-
-const response=
-await fetch(
-
-"https://opensky-network.org/api/states/all",
-
-{
-
-headers:{
-
-Authorization:
-`Bearer ${access}`
-
-}
-
-}
-
-);
-
-const data=
-await response.json();
-
-const nearby=[];
-
-for(
-
-const p
-
-of
-
-data.states||
-
-[]
-
-){
-
-if(
-!p[5]
-||
-!p[6]
-)
-continue;
-
-const d=
-
-km(
-
-lat,
-
-lon,
-
-p[6],
-
-p[5]
-
-);
-
-if(
-d<=radius
-){
-
-nearby.push({
-
-flight:
-p[1],
-
-distance:
-d,
-
-heading:
-p[10]
-
-});
-
-}
-
-}
-
-console.log(
-"Nearby:",
-nearby.length
-);
-
-res.json(
-nearby
-);
-
-}
-
-catch(e){
-
-console.log(
-e
-);
-
-res.json([]);
-
-}
-
-});
-
-app.listen(
-
-3000,
-
-()=>{
-
-console.log(
-"Little Radar running"
-);
-
-});
+// ── Start ─────────────────────────────────────────────────
+app.listen(3000, () => console.log("Little Radar running on :3000"));

@@ -193,6 +193,23 @@ input { width: 74px; background: #11231B; color: white; border-color: #1e3d2e; }
 
 .small { color: #8DB39C; font-size: 13px; }
 
+/* ── Last-known status banner ── */
+.stale-banner {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  background: rgba(255, 160, 50, 0.15);
+  border-bottom: 1px solid rgba(255, 160, 50, 0.5);
+  color: #FFA032;
+  font-size: 13px;
+  text-align: center;
+  padding: 6px 12px;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+}
+.stale-banner.visible { display: block; }
+
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    LANDSCAPE (≥601px wide)
@@ -292,6 +309,10 @@ input { width: 74px; background: #11231B; color: white; border-color: #1e3d2e; }
 </head>
 <body>
 
+<div class="stale-banner" id="staleBanner">
+  ⚠ Last known positions — waiting for connection
+</div>
+
 <div class="app">
 
   <div class="left">
@@ -351,6 +372,13 @@ const countEl        = document.getElementById("count");
 const logsEl         = document.getElementById("logs");
 const aircraftListEl = document.getElementById("aircraftList");
 const locationEl     = document.getElementById("location");
+const staleBanner    = document.getElementById("staleBanner");
+
+// Overlay elements — only present in the tiny-screen (320×240) layout.
+// Declared here so scan() can update them safely regardless of breakpoint.
+const overlayCount = document.getElementById("overlayCount");
+const overlayLoc   = document.getElementById("overlayLocation");
+const overlayList  = document.getElementById("overlayList");
 
 const planeMap = new Map(); // callsign → { el, lastSeen, x, y }
 
@@ -495,6 +523,16 @@ function createDot() {
   return el;
 }
 
+// Compute the bearing in degrees (0=N clockwise) from point 1 to point 2.
+function bearingTo(lat1, lon1, lat2, lon2) {
+  const toRad = d => d * Math.PI / 180;
+  const dLon  = toRad(lon2 - lon1);
+  const y = Math.sin(dLon) * Math.cos(toRad(lat2));
+  const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2))
+           - Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLon);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
 function updatePlane(plane, radius) {
   const key = getKey(plane);
   let obj = planeMap.get(key);
@@ -503,7 +541,18 @@ function updatePlane(plane, radius) {
     planeMap.set(key, obj);
   }
 
-  const angleRad = ((plane.heading || 0) - 90) * Math.PI / 180;
+  // Place the dot using the aircraft's actual lat/lon relative to the user.
+  // plane.heading is where the aircraft is POINTING — not where it IS from us.
+  // We compute the true bearing from user position to aircraft position instead.
+  let angleRad;
+  if (plane.lat != null && plane.lon != null) {
+    const bearing = bearingTo(userLat, userLon, plane.lat, plane.lon);
+    angleRad = (bearing - 90) * Math.PI / 180; // -90 rotates so N=up on screen
+  } else {
+    // Fallback: server sent a pre-computed bearing field rather than lat/lon
+    angleRad = ((plane.bearing || plane.heading || 0) - 90) * Math.PI / 180;
+  }
+
   const r = Math.min(plane.distance / radius, 1) * 45;
 
   obj.x = 50 + Math.cos(angleRad) * r;
@@ -598,49 +647,100 @@ async function scan() {
   updateRingLabels();
   log(`Scanning ${radius} km`);
 
-  const planes = await fetch(
-    `/planes?lat=${userLat}&lon=${userLon}&radius=${radius}`
-  ).then(r => r.json());
+  let planes = [];
+  let isStale = false;
 
-  countEl.textContent = planes.length;
+  try {
+    const res  = await fetch(`/planes?lat=${userLat}&lon=${userLon}&radius=${radius}`);
+    const data = await res.json();
+
+    planes  = data.planes  || [];
+    isStale = data.stale   || false;
+
+  } catch (e) {
+    // Server itself unreachable (e.g. Node crashed, no network at all).
+    // Keep whatever dots are already on screen and show the banner.
+    isStale = true;
+    log("Connection lost — showing last known positions");
+  }
+
+  // Show or hide the stale banner
+  staleBanner.classList.toggle("visible", isStale);
+  if (isStale) {
+    log("Showing last known positions");
+  }
+
+  countEl.textContent  = planes.length;
+  if (overlayCount) overlayCount.textContent = planes.length;
   aircraftListEl.innerHTML = "";
+  let overlayItems = "";
 
   planes.forEach(p => {
     updatePlane(p, radius);
-    aircraftListEl.insertAdjacentHTML(
-      "beforeend",
-      `<div class="small">${p.flight || "Flight"} · ${Math.round(p.distance)} km</div>`
-    );
+    const line = `<div class="small">${p.flight || "Flight"} · ${Math.round(p.distance)} km</div>`;
+    aircraftListEl.insertAdjacentHTML("beforeend", line);
+    overlayItems += line;
   });
+
+  if (overlayList) overlayList.innerHTML = overlayItems || "No aircraft";
 
   cleanup();
   requestAnimationFrame(() => requestAnimationFrame(resolveLabels));
 
-  locationEl.innerHTML =
-    `${userLat.toFixed(4)}<br>${userLon.toFixed(4)}<br>Radius: ${radius} km`;
+  const locStr = `${userLat.toFixed(4)}<br>${userLon.toFixed(4)}<br>Radius: ${radius} km`;
+  locationEl.innerHTML = locStr;
+  if (overlayLoc) overlayLoc.innerHTML = locStr;
 }
 
 // ── Geolocation ──
+// watchPosition opens ONE persistent connection to the location provider
+// rather than making a fresh network request every time. This avoids the
+// googleapis.com 400 error that occurs when getCurrentPosition is called
+// too frequently over a long session.
+
+let geoWatchId = null;
 
 function locate() {
-  navigator.geolocation.getCurrentPosition(
+  // Cancel any existing watch before starting a new one
+  if (geoWatchId !== null) {
+    navigator.geolocation.clearWatch(geoWatchId);
+  }
+
+  geoWatchId = navigator.geolocation.watchPosition(
     pos => {
-      userLat = pos.coords.latitude;
-      userLon = pos.coords.longitude;
-      log("Location acquired");
-      fetchMap(userLat, userLon); // fetch map at 100 km for this location
-      scan();
+      const newLat = pos.coords.latitude;
+      const newLon = pos.coords.longitude;
+
+      // Only re-fetch the map if we've moved more than ~200 m
+      const moved = Math.abs(newLat - userLat) > 0.002 ||
+                    Math.abs(newLon - userLon) > 0.002;
+
+      userLat = newLat;
+      userLon = newLon;
+
+      if (moved || cachedWays.length === 0) {
+        log("Location updated — refreshing map");
+        fetchMap(userLat, userLon);
+      }
     },
     err => {
-      log("Location error: " + err.message);
-      fetchMap(userLat, userLon);
-      scan();
+      log("Location error: " + err.message + " — using last known position");
+      // Carry on with whatever coords we have; don't stop scanning
+      if (cachedWays.length === 0) fetchMap(userLat, userLon);
+    },
+    {
+      enableHighAccuracy: false, // low-accuracy = WiFi/cell, no GPS drain
+      timeout: 10000,
+      maximumAge: 60000          // reuse a cached fix up to 60 s old
     }
   );
 }
 
 // ── Boot ──
+// locate() starts a persistent watchPosition stream.
+// scan() polls the /planes endpoint on its own interval independently.
 locate();
+scan();
 setInterval(scan, 15000);
 </script>
 </body>
