@@ -425,6 +425,83 @@ input { width: 74px; background: var(--c-btn-bg); color: var(--c-text); border-c
   letter-spacing: 0.05em;
 }
 
+/* ── Panel tabs ── */
+.panel-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.panel-tab {
+  flex: 1;
+  padding: 5px 0;
+  font-size: 12px;
+  text-align: center;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid var(--c-accent);
+  background: var(--c-btn-bg);
+  color: var(--c-accent);
+  letter-spacing: 0.04em;
+  transition: background 0.15s, color 0.15s;
+}
+.panel-tab.active {
+  background: var(--c-accent);
+  color: var(--c-bg);
+}
+
+/* ── Stats panel ── */
+#statsPanel { display: none; }
+#statsPanel.visible { display: block; }
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(88,255,175,0.07);
+  gap: 6px;
+}
+.stat-row:last-child { border-bottom: none; }
+.stat-lbl {
+  color: var(--c-detail-lbl);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+.stat-val {
+  color: var(--c-text);
+  font-size: 12px;
+  text-align: right;
+}
+.stat-section {
+  background: var(--c-card);
+  padding: 10px;
+  margin-bottom: 8px;
+  border-radius: 10px;
+  transition: background 2s ease;
+}
+.stat-section-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--c-accent);
+  margin-bottom: 6px;
+}
+.stat-reset {
+  width: 100%;
+  margin-top: 8px;
+  padding: 5px;
+  font-size: 11px;
+  background: transparent;
+  border: 1px solid rgba(88,255,175,0.15);
+  color: var(--c-detail-lbl);
+  border-radius: 8px;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+}
+.stat-reset:hover { border-color: var(--c-accent); color: var(--c-accent); }
+
 
 </style>
 </head>
@@ -481,10 +558,58 @@ input { width: 74px; background: var(--c-btn-bg); color: var(--c-text); border-c
 
     <!-- Default panel — hidden while detail is open -->
     <div id="panelDefault">
-      <div class="card">Aircraft: <span id="count">0</span></div>
-      <div class="card" id="location">Waiting…</div>
-      <div class="card" id="aircraftList">No aircraft</div>
-      <div class="card" id="logs">Logs</div>
+
+      <!-- Tab switcher -->
+      <div class="panel-tabs">
+        <div class="panel-tab active" id="tabRadar"  onclick="switchTab('radar')">Radar</div>
+        <div class="panel-tab"        id="tabStats"  onclick="switchTab('stats')">Stats</div>
+      </div>
+
+      <!-- Radar tab content -->
+      <div id="radarPanel">
+        <div class="card">Aircraft: <span id="count">0</span></div>
+        <div class="card" id="location">Waiting…</div>
+        <div class="card" id="aircraftList">No aircraft</div>
+        <div class="card" id="logs">Logs</div>
+      </div>
+
+      <!-- Stats tab content -->
+      <div id="statsPanel">
+
+        <div class="stat-section">
+          <div class="stat-section-title">This session</div>
+          <div class="stat-row"><span class="stat-lbl">Uptime</span>         <span class="stat-val" id="st-uptime">0m</span></div>
+          <div class="stat-row"><span class="stat-lbl">Scans</span>          <span class="stat-val" id="st-scans-session">0</span></div>
+          <div class="stat-row"><span class="stat-lbl">Aircraft seen</span>  <span class="stat-val" id="st-seen-session">0</span></div>
+          <div class="stat-row"><span class="stat-lbl">Peak count</span>     <span class="stat-val" id="st-peak-session">0</span></div>
+        </div>
+
+        <div class="stat-section">
+          <div class="stat-section-title">All time</div>
+          <div class="stat-row"><span class="stat-lbl">First boot</span>     <span class="stat-val" id="st-firstboot">—</span></div>
+          <div class="stat-row"><span class="stat-lbl">Total boots</span>    <span class="stat-val" id="st-boots">—</span></div>
+          <div class="stat-row"><span class="stat-lbl">Total uptime</span>   <span class="stat-val" id="st-totaluptime">—</span></div>
+          <div class="stat-row"><span class="stat-lbl">Longest session</span><span class="stat-val" id="st-longest">—</span></div>
+          <div class="stat-row"><span class="stat-lbl">Total scans</span>    <span class="stat-val" id="st-scans-total">—</span></div>
+          <div class="stat-row"><span class="stat-lbl">Unique aircraft</span><span class="stat-val" id="st-unique">—</span></div>
+          <div class="stat-row"><span class="stat-lbl">Peak ever</span>      <span class="stat-val" id="st-peak-ever">—</span></div>
+        </div>
+
+        <div class="stat-section">
+          <div class="stat-section-title">Records</div>
+          <div class="stat-row"><span class="stat-lbl">Closest</span>        <span class="stat-val" id="st-closest">—</span></div>
+          <div class="stat-row"><span class="stat-lbl">Highest</span>        <span class="stat-val" id="st-highest">—</span></div>
+          <div class="stat-row"><span class="stat-lbl">Fastest</span>        <span class="stat-val" id="st-fastest">—</span></div>
+        </div>
+
+        <div class="stat-section">
+          <div class="stat-section-title">Top countries</div>
+          <div id="st-countries" class="small" style="line-height:1.8"></div>
+        </div>
+
+        <button class="stat-reset" onclick="confirmResetStats()">Reset all stats</button>
+      </div>
+
     </div>
 
   </div>
@@ -746,11 +871,11 @@ function updatePlane(plane, radius) {
   const newX = 50 + Math.cos(angleRad) * r;
   const newY = 50 + Math.sin(angleRad) * r;
 
-  // Record trail position before moving (only if meaningfully different)
-  if (obj.el.style.opacity !== "0") {
+  // Store geo position in trail (radius-independent) before moving
+  if (obj.el.style.opacity !== "0" && plane.lat != null && plane.lon != null) {
     const dx = newX - obj.x, dy = newY - obj.y;
     if (Math.sqrt(dx*dx + dy*dy) > 0.3) {
-      obj.trail.push({ x: obj.x, y: obj.y });
+      obj.trail.push({ lat: plane.lat, lon: plane.lon, dist: plane.distance });
       if (obj.trail.length > TRAIL_MAX) obj.trail.shift();
     }
   }
@@ -765,7 +890,6 @@ function updatePlane(plane, radius) {
   const headingDeg = plane.heading != null ? plane.heading : 0;
   const isSelected = key === selectedKey;
   obj.el.querySelector("svg").style.transform = `rotate(${headingDeg}deg)`;
-  // Update fill colour for selected state
   obj.el.querySelectorAll("svg ellipse, svg polygon").forEach(s => {
     s.setAttribute("fill", isSelected ? "#ffffff" : "var(--c-accent)");
   });
@@ -774,29 +898,34 @@ function updatePlane(plane, radius) {
   obj.lastSeen = Date.now();
 
   // Draw trail dots
-  updateTrail(obj);
+  updateTrail(obj, radius);
 }
 
-function updateTrail(obj) {
+function updateTrail(obj, radius) {
   // Remove old trail elements
   obj.trailEls.forEach(el => el.remove());
   obj.trailEls = [];
 
-  // Sizes and opacities for trail positions (oldest → newest)
-  const sizes    = [4, 5, 6, 7, 8];
+  const sizes     = [4, 5, 6, 7, 8];
   const opacities = [0.06, 0.12, 0.20, 0.30, 0.44];
 
   obj.trail.forEach((pos, i) => {
-    // i=0 is oldest, i=trail.length-1 is newest
-    const age = obj.trail.length - 1 - i; // 0=newest trail, 4=oldest
-    const idx = TRAIL_MAX - 1 - age;
+    // Reproject from stored lat/lon at the CURRENT radius — survives preset changes
+    const bearing  = bearingTo(userLat, userLon, pos.lat, pos.lon);
+    const angleRad = (bearing - 90) * Math.PI / 180;
+    const r        = Math.min(pos.dist / radius, 1) * 45;
+    const tx       = 50 + Math.cos(angleRad) * r;
+    const ty       = 50 + Math.sin(angleRad) * r;
+
+    const age  = obj.trail.length - 1 - i; // 0=newest trail
+    const idx  = TRAIL_MAX - 1 - age;
     const size    = sizes[Math.max(0, idx)];
     const opacity = opacities[Math.max(0, idx)];
 
     const dot = document.createElement("div");
     dot.className = "trail-dot";
-    dot.style.left    = pos.x + "%";
-    dot.style.top     = pos.y + "%";
+    dot.style.left    = tx + "%";
+    dot.style.top     = ty + "%";
     dot.style.width   = size + "px";
     dot.style.height  = size + "px";
     dot.style.opacity = opacity;
@@ -940,6 +1069,8 @@ async function scan() {
   });
 
   cleanup();
+  recordScan(planes);
+  renderStats();
   requestAnimationFrame(() => requestAnimationFrame(resolveLabels));
   locationEl.innerHTML =
     `${userLat.toFixed(4)}<br>${userLon.toFixed(4)}<br>Radius: ${radius} km`;
@@ -978,8 +1109,179 @@ function locate() {
 }
 
 // ════════════════════════════════════════════════════════
-// DAY / NIGHT MODE
+// PANEL TAB SWITCHER
 // ════════════════════════════════════════════════════════
+
+function switchTab(tab) {
+  document.getElementById("tabRadar").classList.toggle("active", tab === "radar");
+  document.getElementById("tabStats").classList.toggle("active", tab === "stats");
+  document.getElementById("radarPanel").style.display  = tab === "radar" ? "" : "none";
+  document.getElementById("statsPanel").classList.toggle("visible", tab === "stats");
+}
+
+
+// ════════════════════════════════════════════════════════
+// STATS ENGINE
+// ════════════════════════════════════════════════════════
+
+const STATS_KEY = "lr_stats_v1";
+const sessionStart = Date.now();
+
+function loadStats() {
+  try {
+    return JSON.parse(localStorage.getItem(STATS_KEY)) || {};
+  } catch { return {}; }
+}
+
+function saveStats(s) {
+  localStorage.setItem(STATS_KEY, JSON.stringify(s));
+}
+
+function initStats() {
+  let s = loadStats();
+  if (!s.firstBoot) s.firstBoot = new Date().toISOString();
+  s.boots         = (s.boots || 0) + 1;
+  s.totalScans    = s.totalScans    || 0;
+  s.totalUptime   = s.totalUptime   || 0;
+  s.longestSession= s.longestSession|| 0;
+  s.uniqueAircraft= s.uniqueAircraft|| {};
+  s.peakEver      = s.peakEver      || { count: 0, date: null };
+  s.closest       = s.closest       || null;
+  s.highest       = s.highest       || null;
+  s.fastest       = s.fastest       || null;
+  s.countries     = s.countries     || {};
+  saveStats(s);
+  return s;
+}
+
+let globalStats = initStats();
+
+// Session-only counters
+let sessionScans   = 0;
+let sessionSeen    = new Set();
+let sessionPeak    = 0;
+
+function fmtDuration(ms) {
+  const s = Math.floor(ms / 1000);
+  const m = Math.floor(s / 60);
+  const h = Math.floor(m / 60);
+  const d = Math.floor(h / 24);
+  if (d > 0)  return `${d}d ${h % 24}h`;
+  if (h > 0)  return `${h}h ${m % 60}m`;
+  if (m > 0)  return `${m}m`;
+  return `${s}s`;
+}
+
+function fmtDate(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
+
+function recordScan(planes) {
+  sessionScans++;
+  globalStats.totalScans++;
+
+  // unique aircraft
+  planes.forEach(p => {
+    const key = getKey(p);
+    sessionSeen.add(key);
+    globalStats.uniqueAircraft[key] = true;
+  });
+
+  // peak count
+  const count = planes.length;
+  if (count > sessionPeak) sessionPeak = count;
+  if (count > globalStats.peakEver.count) {
+    globalStats.peakEver = { count, date: new Date().toISOString() };
+  }
+
+  // records per aircraft
+  planes.forEach(p => {
+    if (!p.onGround) {
+      // closest
+      if (p.distance != null && (!globalStats.closest || p.distance < globalStats.closest.dist)) {
+        globalStats.closest = { key: getKey(p), dist: p.distance, date: new Date().toISOString() };
+      }
+      // highest
+      if (p.altitudeFt != null && (!globalStats.highest || p.altitudeFt > globalStats.highest.alt)) {
+        globalStats.highest = { key: getKey(p), alt: p.altitudeFt, date: new Date().toISOString() };
+      }
+      // fastest
+      if (p.speedKnots != null && (!globalStats.fastest || p.speedKnots > globalStats.fastest.spd)) {
+        globalStats.fastest = { key: getKey(p), spd: p.speedKnots, date: new Date().toISOString() };
+      }
+      // countries
+      if (p.country) globalStats.countries[p.country] = (globalStats.countries[p.country] || 0) + 1;
+    }
+  });
+
+  saveStats(globalStats);
+}
+
+function flushSessionUptime() {
+  const elapsed = Date.now() - sessionStart;
+  globalStats.totalUptime   += elapsed;
+  globalStats.longestSession = Math.max(globalStats.longestSession, elapsed);
+  saveStats(globalStats);
+}
+
+// Flush uptime on page unload (best-effort)
+window.addEventListener("beforeunload", flushSessionUptime);
+// Also flush every 60s so a hard power-off doesn't lose too much
+setInterval(flushSessionUptime, 60000);
+
+function renderStats() {
+  const elapsed = Date.now() - sessionStart;
+
+  // Session
+  document.getElementById("st-uptime").textContent         = fmtDuration(elapsed);
+  document.getElementById("st-scans-session").textContent  = sessionScans;
+  document.getElementById("st-seen-session").textContent   = sessionSeen.size;
+  document.getElementById("st-peak-session").textContent   = sessionPeak;
+
+  // All time
+  const s = globalStats;
+  document.getElementById("st-firstboot").textContent  = fmtDate(s.firstBoot);
+  document.getElementById("st-boots").textContent      = s.boots;
+  document.getElementById("st-totaluptime").textContent= fmtDuration((s.totalUptime || 0) + elapsed);
+  document.getElementById("st-longest").textContent    = fmtDuration(Math.max(s.longestSession || 0, elapsed));
+  document.getElementById("st-scans-total").textContent= s.totalScans;
+  document.getElementById("st-unique").textContent     = Object.keys(s.uniqueAircraft || {}).length;
+  document.getElementById("st-peak-ever").textContent  = s.peakEver?.count
+    ? `${s.peakEver.count} · ${fmtDate(s.peakEver.date)}`
+    : "—";
+
+  // Records
+  document.getElementById("st-closest").textContent = s.closest
+    ? `${s.closest.key} · ${s.closest.dist} km`  : "—";
+  document.getElementById("st-highest").textContent = s.highest
+    ? `${s.highest.key} · ${s.highest.alt.toLocaleString()} ft` : "—";
+  document.getElementById("st-fastest").textContent = s.fastest
+    ? `${s.fastest.key} · ${s.fastest.spd} kts` : "—";
+
+  // Top countries
+  const sorted = Object.entries(s.countries || {})
+    .sort((a, b) => b[1] - a[1]).slice(0, 5);
+  document.getElementById("st-countries").innerHTML = sorted.length
+    ? sorted.map(([c, n]) => `<span style="color:var(--c-text)">${c}</span> <span style="color:var(--c-detail-lbl)">${n}</span>`).join("  ·  ")
+    : "<span style='color:var(--c-detail-lbl)'>No data yet</span>";
+}
+
+function confirmResetStats() {
+  if (confirm("Reset all Little Radar stats? This cannot be undone.")) {
+    localStorage.removeItem(STATS_KEY);
+    globalStats = initStats();
+    sessionScans = 0; sessionSeen.clear(); sessionPeak = 0;
+    renderStats();
+  }
+}
+
+// Refresh stats display every 10 seconds
+setInterval(renderStats, 10000);
+
+
+
 
 const modeIndicatorEl = document.getElementById("modeIndicator");
 let sunriseMs = null, sunsetMs = null;
