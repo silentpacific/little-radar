@@ -1,5 +1,5 @@
 # Little Radar
-Version: 0.3
+Version: 0.4
 Status: Browser Prototype Complete → Hardware Prototype In Progress
 
 Owner: Rahul
@@ -278,6 +278,7 @@ Captive portal for WiFi setup on first boot.
 # Radius Behaviour
 
 Preset values: 5 / 25 / 50 / 100 / 250 km
+Default: 25 km
 500 km removed — simpler UI.
 
 ---
@@ -303,13 +304,30 @@ Status:   Approved
 
 ## Aircraft trails
 
-Target:   Store and display last 3 positions per aircraft
-Status:   Approved
+Target:   Store and display last 5 positions per aircraft, fading from near-invisible to 44% opacity
+Status:   Built (V0.4)
 
 ## Sweep illumination
 
 Target:   Radar sweep illuminates aircraft dots as it passes
 Decision: Sweep is visual only — aircraft movement remains continuous
+
+## Aircraft icon
+
+Target:   Heading-matched delta SVG silhouette replacing circle dots
+Status:   Built (V0.4)
+
+## Label collision resolution
+
+Target:   8-direction greedy placement — labels try right, left, above, below, and 4 diagonals
+Status:   Built (V0.4)
+
+## Day / Night mode
+
+Target:   Automatic light/dark theme based on sunrise/sunset at device location
+API:      sunrisesunset.io (free, no key, timezone=auto)
+Palette:  Night — existing dark green. Day — muted olive-green on warm grey.
+Status:   Built (V0.4)
 
 ## Aircraft details — browser
 
@@ -412,58 +430,20 @@ Stale data banner.
 Response shape updated: { planes, stale } from /planes endpoint.
 
 
-```markdown
-## V0.4 — Aircraft Details + Cleanup
+## V0.4 — Aircraft Details + Visual Polish (current)
 
-### New
+Aircraft detail panel (tap dot or list row to open).
+Full flight data in API response: altitude, speed, heading, vertical rate, ICAO, country, squawk.
+Detail auto-refreshes on scan; auto-dismisses if aircraft leaves radar.
+Aircraft list rows show ✈ airborne / ⬤ on-ground glyphs.
+320×240 tiny screen layout removed.
 
-**Aircraft detail panel**
-Tap any aircraft dot on the radar or any row in the aircraft
-list to open a full detail view in the right panel.
-
-Displays:
-- Distance from your location
-- Altitude in both metres and feet
-- Speed in km/h, mph, and knots
-- Heading in degrees
-- Vertical movement (climbing / descending / level, in ft/min)
-- ICAO identifier
-- Country of registration
-- Squawk code
-
-Selected dot turns white with a pulsing ring animation.
-Tap the radar background or Dismiss to return to the normal panel.
-
-Aircraft list rows now show ✈ for airborne and ⬤ for on-ground.
-Clicking a list row opens the same detail view.
-
-**Detail auto-refreshes**
-If the detail panel is open when the next scan runs, it
-updates automatically with the latest data for that aircraft.
-
-**Detail auto-dismisses**
-If the selected aircraft disappears from radar (out of range
-or no longer tracked), the detail panel closes cleanly.
-
----
-
-### Changed
-
-**Speed and altitude now included in API response**
-`/planes` endpoint now returns full flight data per aircraft:
-`altitudeM`, `altitudeFt`, `speedKmh`, `speedMph`, `speedKnots`,
-`verticalRate` (ft/min), `onGround`, `icao`, `country`, `squawk`.
-
----
-
-### Removed
-
-**320×240 screen layout removed**
-All CSS and JS targeting tiny screens (≤320px wide,
-≤260px tall landscape) has been removed. Supported
-layouts are now: desktop/large landscape, 1024×600
-landscape (collapsible panel), and mobile portrait.
-```
+Heading-matched delta SVG aircraft icons replace circle dots.
+Fading position trails — last 5 positions per aircraft.
+8-direction greedy label collision resolver.
+Automatic day/night theme via sunrisesunset.io.
+All colours extracted to CSS variables.
+Radius presets: 5 / 25 / 50 / 100 / 250 km — default 25 km.
 
 
 
