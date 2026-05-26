@@ -8,12 +8,83 @@
 /* ── RESET ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* ── THEME VARIABLES ── */
+:root {
+  --c-bg:           #031009;
+  --c-bg2:          #04120A;
+  --c-panel:        #091711;
+  --c-card:         #10221A;
+  --c-text:         #D7FFE9;
+  --c-text-muted:   #8DB39C;
+  --c-accent:       #58FFAF;
+  --c-accent2:      #3ddda0;
+  --c-accent-dim:   #8FFFBD;
+  --c-sweep:        rgba(88,255,175,.22);
+  --c-ring:         rgba(100,255,180,.25);
+  --c-cross:        rgba(100,255,180,.25);
+  --c-btn-bg:       #11231B;
+  --c-btn-hover:    #1a3328;
+  --c-input-border: #1e3d2e;
+  --c-radar-bg:     radial-gradient(circle, rgba(0,255,140,.03), transparent), #04120A;
+  --c-map-water:    rgba(88,210,255,0.35);
+  --c-map-major:    rgba(88,255,175,0.22);
+  --c-map-minor:    rgba(88,255,175,0.11);
+  --c-map-boundary: rgba(88,255,175,0.14);
+  --c-map-other:    rgba(88,255,175,0.08);
+  --c-label-bg:     rgba(0,0,0,.5);
+  --c-detail-bg:    #0d1f17;
+  --c-detail-lbl:   #4d7a60;
+  --c-stale-bg:     rgba(255,160,50,0.15);
+  --c-stale-border: rgba(255,160,50,0.5);
+  --c-stale-text:   #FFA032;
+  --c-trail1:       rgba(88,255,175,0.35);
+  --c-trail2:       rgba(88,255,175,0.20);
+  --c-trail3:       rgba(88,255,175,0.10);
+  --c-trail4:       rgba(88,255,175,0.05);
+}
+
+/* ── DAY MODE ── */
+body.day-mode {
+  --c-bg:           #c8d8c0;
+  --c-bg2:          #b8ccaf;
+  --c-panel:        #bdd1b4;
+  --c-card:         #afc5a6;
+  --c-text:         #0a2214;
+  --c-text-muted:   #2d5c3a;
+  --c-accent:       #006633;
+  --c-accent2:      #005228;
+  --c-accent-dim:   #1a5c38;
+  --c-sweep:        rgba(0,100,50,.18);
+  --c-ring:         rgba(0,80,40,.30);
+  --c-cross:        rgba(0,80,40,.25);
+  --c-btn-bg:       #a8c09e;
+  --c-btn-hover:    #96b08c;
+  --c-input-border: #7a9e72;
+  --c-radar-bg:     radial-gradient(circle, rgba(0,100,50,.04), transparent), #b8ccaf;
+  --c-map-water:    rgba(30,120,200,0.45);
+  --c-map-major:    rgba(0,80,40,0.35);
+  --c-map-minor:    rgba(0,80,40,0.18);
+  --c-map-boundary: rgba(0,80,40,0.20);
+  --c-map-other:    rgba(0,80,40,0.10);
+  --c-label-bg:     rgba(180,210,170,.75);
+  --c-detail-bg:    #a8c09e;
+  --c-detail-lbl:   #1a4d28;
+  --c-stale-bg:     rgba(180,100,0,0.12);
+  --c-stale-border: rgba(180,100,0,0.4);
+  --c-stale-text:   #7a3e00;
+  --c-trail1:       rgba(0,100,50,0.40);
+  --c-trail2:       rgba(0,100,50,0.22);
+  --c-trail3:       rgba(0,100,50,0.11);
+  --c-trail4:       rgba(0,100,50,0.05);
+}
+
 html, body {
   width: 100%; height: 100%;
   overflow: hidden;
-  background: #031009;
-  color: #D7FFE9;
+  background: var(--c-bg);
+  color: var(--c-text);
   font-family: Arial, sans-serif;
+  transition: background 2s ease, color 2s ease;
 }
 
 /* ── ROOT LAYOUT ──
@@ -56,15 +127,16 @@ button, input {
   font-size: 14px;
   cursor: pointer;
   white-space: nowrap;
-  border: 1px solid #58FFAF;
+  border: 1px solid var(--c-accent);
+  transition: background 2s ease, color 2s ease, border-color 2s ease;
 }
 
-button              { background: #11231B; color: #58FFAF; }
-button:hover        { background: #1a3328; }
-button.active       { background: #58FFAF; color: #031009; }
-button.action       { background: #58FFAF; color: #031009; }
-button.action:hover { background: #3ddda0; }
-input { width: 74px; background: #11231B; color: white; border-color: #1e3d2e; }
+button              { background: var(--c-btn-bg);   color: var(--c-accent); }
+button:hover        { background: var(--c-btn-hover); }
+button.active       { background: var(--c-accent);   color: var(--c-bg); }
+button.action       { background: var(--c-accent);   color: var(--c-bg); }
+button.action:hover { background: var(--c-accent2); }
+input { width: 74px; background: var(--c-btn-bg); color: var(--c-text); border-color: var(--c-input-border); }
 
 /* ── RADAR DISC ──
    aspect-ratio:1 keeps it square.
@@ -82,7 +154,8 @@ input { width: 74px; background: #11231B; color: white; border-color: #1e3d2e; }
   position: relative;
   border-radius: 50%;
   overflow: hidden;
-  background: radial-gradient(circle, rgba(0,255,140,.03), transparent), #04120A;
+  background: var(--c-radar-bg);
+  transition: background 2s ease;
 }
 
 /* Map canvas — lowest layer inside the disc */
@@ -97,15 +170,15 @@ input { width: 74px; background: #11231B; color: white; border-color: #1e3d2e; }
 }
 
 /* Crosshairs */
-.cross  { position: absolute; left: 50%; top: 0;   width: 1px;  height: 100%; background: rgba(100,255,180,.25); z-index: 2; }
-.cross2 { position: absolute; left: 0;   top: 50%; width: 100%; height: 1px;  background: rgba(100,255,180,.25); z-index: 2; }
+.cross  { position: absolute; left: 50%; top: 0;   width: 1px;  height: 100%; background: var(--c-cross); z-index: 2; }
+.cross2 { position: absolute; left: 0;   top: 50%; width: 100%; height: 1px;  background: var(--c-cross); z-index: 2; }
 
 /* Range rings */
 .ring {
   position: absolute;
   left: 50%; top: 50%;
   transform: translate(-50%, -50%);
-  border: 1px solid rgba(100,255,180,.25);
+  border: 1px solid var(--c-ring);
   border-radius: 50%;
   z-index: 2;
 }
@@ -114,9 +187,9 @@ input { width: 74px; background: #11231B; color: white; border-color: #1e3d2e; }
   position: absolute;
   bottom: 14%; right: 6%;
   font-size: 12px;
-  color: #8FFFBD;
+  color: var(--c-accent-dim);
   padding: 2px 8px;
-  background: rgba(0,0,0,.6);
+  background: var(--c-label-bg);
   border-radius: 10px;
   white-space: nowrap;
   pointer-events: none;
@@ -125,7 +198,7 @@ input { width: 74px; background: #11231B; color: white; border-color: #1e3d2e; }
 /* Rotating sweep */
 .sweep {
   position: absolute; inset: 0;
-  background: conic-gradient(rgba(88,255,175,.22), transparent 55deg);
+  background: conic-gradient(var(--c-sweep), transparent 55deg);
   animation: spin 4s linear infinite;
   z-index: 3;
 }
@@ -136,7 +209,7 @@ input { width: 74px; background: #11231B; color: white; border-color: #1e3d2e; }
   position: absolute;
   left: 50%; top: 50%;
   width: 14px; height: 14px;
-  background: #58FFAF;
+  background: var(--c-accent);
   border-radius: 50%;
   transform: translate(-50%, -50%);
   z-index: 5;
@@ -147,51 +220,65 @@ input { width: 74px; background: #11231B; color: white; border-color: #1e3d2e; }
   position: absolute;
   font-size: 20px;
   font-weight: 700;
-  color: #7FFFBE;
+  color: var(--c-accent-dim);
   z-index: 5;
 }
 
-/* Aircraft dots */
+/* Aircraft icon — inline SVG plane */
 .dot {
   position: absolute;
-  width: 12px; height: 12px;
-  background: #58FFAF;
+  width: 20px; height: 20px;
+  transform: translate(-50%, -50%);
+  z-index: 6;
+  cursor: pointer;
+  filter: drop-shadow(0 0 5px var(--c-accent));
+  transition: left 2s linear, top 2s linear, opacity 1s;
+}
+.dot svg { width: 100%; height: 100%; overflow: visible; }
+
+/* Trail dots — canvas layer, handled in JS */
+.trail-dot {
+  position: absolute;
   border-radius: 50%;
   transform: translate(-50%, -50%);
-  box-shadow: 0 0 18px #58FFAF;
-  z-index: 6;
+  pointer-events: none;
+  z-index: 4;
+  background: var(--c-accent);
 }
 
 /* Callsign label */
 .label {
   position: absolute;
   left: 14px; top: -8px;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.3;
   white-space: nowrap;
-  color: #D7FFE9;
-  background: rgba(0,0,0,.5);
+  color: var(--c-text);
+  background: var(--c-label-bg);
   padding: 1px 5px;
   border-radius: 5px;
   pointer-events: none;
+  transition: color 2s ease, background 2s ease;
 }
 
 /* ── RIGHT PANEL ── */
 .panel {
-  background: #091711;
+  background: var(--c-panel);
   padding: 12px;
   overflow-y: auto;
   overflow-x: hidden;
+  transition: background 2s ease;
 }
 
 .card {
-  background: #10221A;
+  background: var(--c-card);
   padding: 10px;
   margin-bottom: 10px;
   border-radius: 10px;
+  transition: background 2s ease;
 }
 
-.small { color: #8DB39C; font-size: 13px; }
+.small { color: var(--c-text-muted); font-size: 13px; }
 
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -237,10 +324,9 @@ input { width: 74px; background: #11231B; color: white; border-color: #1e3d2e; }
 }
 
 
-/* ── Aircraft dot — selected state ── */
+/* ── Aircraft icon — selected state ── */
 .dot.selected {
-  background: #ffffff;
-  box-shadow: 0 0 22px #ffffff;
+  filter: drop-shadow(0 0 7px #ffffff) drop-shadow(0 0 3px #ffffff);
 }
 .dot.selected::after {
   content: '';
@@ -258,12 +344,13 @@ input { width: 74px; background: #11231B; color: white; border-color: #1e3d2e; }
 /* ── Detail card (replaces panel content when aircraft selected) ── */
 #detailCard {
   display: none;
-  background: #0d1f17;
+  background: var(--c-detail-bg);
   border: 1px solid rgba(88,255,175,0.2);
   padding: 12px;
   margin-bottom: 10px;
   border-radius: 10px;
   animation: fadeIn 0.18s ease;
+  transition: background 2s ease;
 }
 #detailCard.visible { display: block; }
 @keyframes fadeIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:none; } }
@@ -271,7 +358,7 @@ input { width: 74px; background: #11231B; color: white; border-color: #1e3d2e; }
 .detail-callsign {
   font-size: 20px;
   font-weight: 700;
-  color: #58FFAF;
+  color: var(--c-accent);
   letter-spacing: 0.07em;
   margin-bottom: 10px;
 }
@@ -285,14 +372,14 @@ input { width: 74px; background: #11231B; color: white; border-color: #1e3d2e; }
 }
 .detail-row:last-of-type { border-bottom: none; }
 .detail-lbl {
-  color: #4d7a60;
+  color: var(--c-detail-lbl);
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   flex-shrink: 0;
 }
 .detail-val {
-  color: #D7FFE9;
+  color: var(--c-text);
   font-size: 12px;
   text-align: right;
 }
@@ -303,11 +390,11 @@ input { width: 74px; background: #11231B; color: white; border-color: #1e3d2e; }
   font-size: 12px;
   background: transparent;
   border: 1px solid rgba(88,255,175,0.2);
-  color: #4d7a60;
+  color: var(--c-detail-lbl);
   border-radius: 8px;
   cursor: pointer;
 }
-.detail-close:hover { border-color: #58FFAF; color: #58FFAF; }
+.detail-close:hover { border-color: var(--c-accent); color: var(--c-accent); }
 
 /* ── Last-known status banner ── */
 .stale-banner {
@@ -315,9 +402,9 @@ input { width: 74px; background: #11231B; color: white; border-color: #1e3d2e; }
   position: fixed;
   top: 0; left: 0; right: 0;
   z-index: 100;
-  background: rgba(255,160,50,0.15);
-  border-bottom: 1px solid rgba(255,160,50,0.5);
-  color: #FFA032;
+  background: var(--c-stale-bg);
+  border-bottom: 1px solid var(--c-stale-border);
+  color: var(--c-stale-text);
   font-size: 13px;
   text-align: center;
   padding: 6px 12px;
@@ -326,6 +413,19 @@ input { width: 74px; background: #11231B; color: white; border-color: #1e3d2e; }
 }
 .stale-banner.visible { display: block; }
 
+/* ── Day/night mode indicator ── */
+#modeIndicator {
+  position: fixed;
+  bottom: 10px; right: 10px;
+  font-size: 11px;
+  color: var(--c-text-muted);
+  opacity: 0.5;
+  pointer-events: none;
+  z-index: 50;
+  letter-spacing: 0.05em;
+}
+
+
 </style>
 </head>
 <body>
@@ -333,6 +433,7 @@ input { width: 74px; background: #11231B; color: white; border-color: #1e3d2e; }
 <div class="stale-banner" id="staleBanner">
   ⚠ Last known positions — waiting for connection
 </div>
+<div id="modeIndicator"></div>
 
 <div class="app">
 
@@ -508,11 +609,11 @@ function drawMap(ways, cLat, cLon, displayRadiusKm) {
     const isMinorRoad = ["tertiary","unclassified","residential"].includes(tags.highway);
     const isBoundary  = tags.boundary === "administrative";
 
-    if      (isWater)     { ctx.strokeStyle = "rgba(88,210,255,0.35)"; ctx.lineWidth = 1.2; ctx.setLineDash([]); }
-    else if (isMajorRoad) { ctx.strokeStyle = "rgba(88,255,175,0.22)"; ctx.lineWidth = 1.0; ctx.setLineDash([]); }
-    else if (isMinorRoad) { ctx.strokeStyle = "rgba(88,255,175,0.11)"; ctx.lineWidth = 0.6; ctx.setLineDash([]); }
-    else if (isBoundary)  { ctx.strokeStyle = "rgba(88,255,175,0.14)"; ctx.lineWidth = 0.8; ctx.setLineDash([4,6]); }
-    else                  { ctx.strokeStyle = "rgba(88,255,175,0.08)"; ctx.lineWidth = 0.5; ctx.setLineDash([]); }
+    if      (isWater)     { ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--c-map-water').trim();    ctx.lineWidth = 1.2; ctx.setLineDash([]); }
+    else if (isMajorRoad) { ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--c-map-major').trim();    ctx.lineWidth = 1.0; ctx.setLineDash([]); }
+    else if (isMinorRoad) { ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--c-map-minor').trim();    ctx.lineWidth = 0.6; ctx.setLineDash([]); }
+    else if (isBoundary)  { ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--c-map-boundary').trim(); ctx.lineWidth = 0.8; ctx.setLineDash([4,6]); }
+    else                  { ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--c-map-other').trim();    ctx.lineWidth = 0.5; ctx.setLineDash([]); }
 
     ctx.beginPath();
     way.geometry.forEach((pt, i) => {
@@ -584,12 +685,23 @@ function log(msg) {
 
 function getKey(p) { return (p.flight || p.icao || "unknown").trim(); }
 
+// ── Delta SVG plane icon (points up = north = 0°, rotated by heading) ──
+function planeSVG(heading, selected) {
+  const colour = selected ? "#ffffff" : "var(--c-accent)";
+  // heading: 0 = north (up). SVG plane points up by default.
+  return `<svg viewBox="-10 -12 20 24" xmlns="http://www.w3.org/2000/svg" style="transform:rotate(${heading}deg);transition:transform 2s linear;">
+    <ellipse cx="0" cy="0" rx="1.8" ry="7" fill="${colour}"/>
+    <polygon points="0,-2 -11,5 -1,2" fill="${colour}"/>
+    <polygon points="0,-2 11,5 1,2" fill="${colour}"/>
+    <polygon points="0,5 -3.5,9 3.5,9" fill="${colour}"/>
+  </svg>`;
+}
+
 function createDot(key) {
   const el = document.createElement("div");
   el.className = "dot";
-  el.style.transition = "left 2s linear, top 2s linear, opacity 1s";
   el.style.opacity = "0";
-  el.innerHTML = `<div class="label"></div>`;
+  el.innerHTML = planeSVG(0, false) + `<div class="label"></div>`;
   el.addEventListener("click", e => {
     e.stopPropagation();
     const obj = planeMap.get(key);
@@ -608,15 +720,18 @@ function bearingTo(lat1, lon1, lat2, lon2) {
   return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
 }
 
+const TRAIL_MAX = 5; // number of trail positions to keep
+
 function updatePlane(plane, radius) {
   const key = getKey(plane);
   let obj = planeMap.get(key);
   if (!obj) {
-    obj = { el: createDot(key), lastSeen: Date.now(), x: 50, y: 50, data: plane };
+    obj = { el: createDot(key), lastSeen: Date.now(), x: 50, y: 50, data: plane, trail: [], trailEls: [] };
+    obj.el.style.transition = "left 2s linear, top 2s linear, opacity 1s";
     planeMap.set(key, obj);
   }
-  obj.data = plane; // keep fresh for detail panel
-  if (selectedKey === key) showDetail(plane); // refresh open detail
+  obj.data = plane;
+  if (selectedKey === key) showDetail(plane);
 
   let angleRad;
   if (plane.lat != null && plane.lon != null) {
@@ -626,43 +741,123 @@ function updatePlane(plane, radius) {
     angleRad = ((plane.bearing || plane.heading || 0) - 90) * Math.PI / 180;
   }
 
-  const r = Math.min(plane.distance / radius, 1) * 45;
-  obj.x = 50 + Math.cos(angleRad) * r;
-  obj.y = 50 + Math.sin(angleRad) * r;
+  const r    = Math.min(plane.distance / radius, 1) * 45;
+  const newX = 50 + Math.cos(angleRad) * r;
+  const newY = 50 + Math.sin(angleRad) * r;
+
+  // Record trail position before moving (only if meaningfully different)
+  if (obj.el.style.opacity !== "0") {
+    const dx = newX - obj.x, dy = newY - obj.y;
+    if (Math.sqrt(dx*dx + dy*dy) > 0.3) {
+      obj.trail.push({ x: obj.x, y: obj.y });
+      if (obj.trail.length > TRAIL_MAX) obj.trail.shift();
+    }
+  }
+
+  obj.x = newX;
+  obj.y = newY;
   obj.el.style.left    = obj.x + "%";
   obj.el.style.top     = obj.y + "%";
   obj.el.style.opacity = "1";
-  obj.el.classList.toggle("selected", key === selectedKey);
+
+  // Update SVG plane icon with heading rotation
+  const headingDeg = plane.heading != null ? plane.heading : 0;
+  const isSelected = key === selectedKey;
+  obj.el.querySelector("svg").style.transform = `rotate(${headingDeg}deg)`;
+  // Update fill colour for selected state
+  obj.el.querySelectorAll("svg ellipse, svg polygon").forEach(s => {
+    s.setAttribute("fill", isSelected ? "#ffffff" : "var(--c-accent)");
+  });
+  obj.el.classList.toggle("selected", isSelected);
   obj.el.querySelector(".label").innerHTML = `${key}<br>${plane.distance} km`;
   obj.lastSeen = Date.now();
+
+  // Draw trail dots
+  updateTrail(obj);
+}
+
+function updateTrail(obj) {
+  // Remove old trail elements
+  obj.trailEls.forEach(el => el.remove());
+  obj.trailEls = [];
+
+  // Sizes and opacities for trail positions (oldest → newest)
+  const sizes    = [4, 5, 6, 7, 8];
+  const opacities = [0.06, 0.12, 0.20, 0.30, 0.44];
+
+  obj.trail.forEach((pos, i) => {
+    // i=0 is oldest, i=trail.length-1 is newest
+    const age = obj.trail.length - 1 - i; // 0=newest trail, 4=oldest
+    const idx = TRAIL_MAX - 1 - age;
+    const size    = sizes[Math.max(0, idx)];
+    const opacity = opacities[Math.max(0, idx)];
+
+    const dot = document.createElement("div");
+    dot.className = "trail-dot";
+    dot.style.left    = pos.x + "%";
+    dot.style.top     = pos.y + "%";
+    dot.style.width   = size + "px";
+    dot.style.height  = size + "px";
+    dot.style.opacity = opacity;
+    radarEl.appendChild(dot);
+    obj.trailEls.push(dot);
+  });
 }
 
 function resolveLabels() {
   const entries = [...planeMap.values()].filter(o => o.el.style.opacity !== "0");
   if (entries.length < 2) return;
   const { width: W, height: H } = radarEl.getBoundingClientRect();
+
+  // Candidate offsets to try: right, left, below, above, and 4 diagonals
+  const CANDIDATES = [
+    { ox:  14, oy: -8  },  // default: right-centre
+    { ox:  14, oy: -24 },  // right-up
+    { ox:  14, oy:  12 },  // right-down
+    { ox: -80, oy: -8  },  // left-centre
+    { ox: -80, oy: -24 },  // left-up
+    { ox: -80, oy:  12 },  // left-down
+    { ox: -30, oy: -28 },  // above-centre
+    { ox: -30, oy:  18 },  // below-centre
+  ];
+  const PAD = 5;
+
   const labels = entries.map(obj => {
     const labelEl = obj.el.querySelector(".label");
-    return { labelEl,
-      lx: (obj.x / 100) * W, ly: (obj.y / 100) * H,
-      ox: 14, oy: -8,
-      lw: labelEl.offsetWidth  || 70,
-      lh: labelEl.offsetHeight || 32 };
+    return {
+      labelEl,
+      lx: (obj.x / 100) * W,
+      ly: (obj.y / 100) * H,
+      ox: CANDIDATES[0].ox,
+      oy: CANDIDATES[0].oy,
+      lw: labelEl.offsetWidth  || 68,
+      lh: labelEl.offsetHeight || 30,
+    };
   });
-  const PAD = 6;
-  for (let pass = 0; pass < 3; pass++) {
-    for (let i = 0; i < labels.length; i++) {
-      for (let j = i + 1; j < labels.length; j++) {
-        const a = labels[i], b = labels[j];
-        const ax1=a.lx+a.ox, ay1=a.ly+a.oy, ax2=ax1+a.lw, ay2=ay1+a.lh;
-        const bx1=b.lx+b.ox, by1=b.ly+b.oy, bx2=bx1+b.lw, by2=by1+b.lh;
-        if (ax1<bx2+PAD && ax2+PAD>bx1 && ay1<by2+PAD && ay2+PAD>by1) {
-          const shift = (ay2+PAD-by1)/2;
-          a.oy -= shift; b.oy += shift;
-        }
-      }
-    }
+
+  function overlaps(a, b) {
+    const ax1=a.lx+a.ox, ay1=a.ly+a.oy, ax2=ax1+a.lw, ay2=ay1+a.lh;
+    const bx1=b.lx+b.ox, by1=b.ly+b.oy, bx2=bx1+b.lw, by2=by1+b.lh;
+    return ax1<bx2+PAD && ax2+PAD>bx1 && ay1<by2+PAD && ay2+PAD>by1;
   }
+
+  // Greedy placement: for each label, try each candidate offset in order
+  // and pick the first one that doesn't collide with already-placed labels.
+  for (let i = 0; i < labels.length; i++) {
+    const a = labels[i];
+    let placed = false;
+    for (const cand of CANDIDATES) {
+      a.ox = cand.ox; a.oy = cand.oy;
+      let collision = false;
+      for (let j = 0; j < i; j++) {
+        if (overlaps(a, labels[j])) { collision = true; break; }
+      }
+      if (!collision) { placed = true; break; }
+    }
+    // If every candidate collides, fall back to default (best effort)
+    if (!placed) { a.ox = CANDIDATES[0].ox; a.oy = CANDIDATES[0].oy; }
+  }
+
   labels.forEach(({ labelEl, ox, oy }) => {
     labelEl.style.left = ox + "px";
     labelEl.style.top  = oy + "px";
@@ -674,6 +869,8 @@ function cleanup() {
   planeMap.forEach((obj, key) => {
     if (now - obj.lastSeen > 30000) {
       obj.el.style.opacity = "0";
+      obj.trailEls.forEach(el => el.remove());
+      obj.trailEls = [];
       setTimeout(() => obj.el.remove(), 1000);
       planeMap.delete(key);
       if (selectedKey === key) clearSelection();
@@ -779,10 +976,61 @@ function locate() {
   );
 }
 
+// ════════════════════════════════════════════════════════
+// DAY / NIGHT MODE
+// ════════════════════════════════════════════════════════
+
+const modeIndicatorEl = document.getElementById("modeIndicator");
+let sunriseMs = null, sunsetMs = null;
+
+async function fetchSunTimes(lat, lon) {
+  try {
+    const res  = await fetch(`https://api.sunrisesunset.io/json?lat=${lat}&lng=${lon}&timezone=auto`);
+    const data = await res.json();
+    if (data.status !== "OK") return;
+
+    // API returns times in local timezone strings like "6:23:45 AM"
+    const today = new Date().toDateString();
+    sunriseMs = new Date(`${today} ${data.results.sunrise}`).getTime();
+    sunsetMs  = new Date(`${today} ${data.results.sunset}`).getTime();
+    log(`Sun: rise ${data.results.sunrise}, set ${data.results.sunset}`);
+  } catch (e) {
+    log("Sun times unavailable — night mode default");
+  }
+}
+
+function applyDayNight() {
+  if (sunriseMs == null || sunsetMs == null) {
+    // No data yet — stay in night mode
+    document.body.classList.remove("day-mode");
+    modeIndicatorEl.textContent = "";
+    return;
+  }
+  const now = Date.now();
+  // Add a 30-min civil twilight buffer on each end for gradual feel
+  const TWILIGHT = 30 * 60 * 1000;
+  const isDay = now >= (sunriseMs + TWILIGHT) && now < (sunsetMs - TWILIGHT);
+  document.body.classList.toggle("day-mode", isDay);
+  modeIndicatorEl.textContent = isDay ? "☀ day" : "☾ night";
+  // Redraw map so canvas colours update with new theme
+  if (isDay !== applyDayNight._lastDay) {
+    applyDayNight._lastDay = isDay;
+    setTimeout(redrawMap, 100); // slight delay so CSS vars have settled
+  }
+}
+applyDayNight._lastDay = null;
+
 // ── Boot ──
 locate();
 scan();
 setInterval(scan, 15000);
+
+// Fetch sun times once location is available, then check every minute
+setTimeout(async () => {
+  await fetchSunTimes(userLat, userLon);
+  applyDayNight();
+}, 2000);
+setInterval(applyDayNight, 60000);
 </script>
 </body>
 </html>
