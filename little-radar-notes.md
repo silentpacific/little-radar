@@ -411,6 +411,62 @@ Stale data banner.
 2 hours continuous operation confirmed.
 Response shape updated: { planes, stale } from /planes endpoint.
 
+
+```markdown
+## V0.4 — Aircraft Details + Cleanup
+
+### New
+
+**Aircraft detail panel**
+Tap any aircraft dot on the radar or any row in the aircraft
+list to open a full detail view in the right panel.
+
+Displays:
+- Distance from your location
+- Altitude in both metres and feet
+- Speed in km/h, mph, and knots
+- Heading in degrees
+- Vertical movement (climbing / descending / level, in ft/min)
+- ICAO identifier
+- Country of registration
+- Squawk code
+
+Selected dot turns white with a pulsing ring animation.
+Tap the radar background or Dismiss to return to the normal panel.
+
+Aircraft list rows now show ✈ for airborne and ⬤ for on-ground.
+Clicking a list row opens the same detail view.
+
+**Detail auto-refreshes**
+If the detail panel is open when the next scan runs, it
+updates automatically with the latest data for that aircraft.
+
+**Detail auto-dismisses**
+If the selected aircraft disappears from radar (out of range
+or no longer tracked), the detail panel closes cleanly.
+
+---
+
+### Changed
+
+**Speed and altitude now included in API response**
+`/planes` endpoint now returns full flight data per aircraft:
+`altitudeM`, `altitudeFt`, `speedKmh`, `speedMph`, `speedKnots`,
+`verticalRate` (ft/min), `onGround`, `icao`, `country`, `squawk`.
+
+---
+
+### Removed
+
+**320×240 screen layout removed**
+All CSS and JS targeting tiny screens (≤320px wide,
+≤260px tall landscape) has been removed. Supported
+layouts are now: desktop/large landscape, 1024×600
+landscape (collapsible panel), and mobile portrait.
+```
+
+
+
 ---
 
 # Versioning and Repo

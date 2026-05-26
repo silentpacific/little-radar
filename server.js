@@ -10,57 +10,30 @@ app.use(express.static("public"));
 const creds = JSON.parse(fs.readFileSync("./credentials.json", "utf8"));
 
 // ── Token cache with expiry ───────────────────────────────
-// OpenSky tokens expire after ~1 hour. We store the expiry
-// time and refresh 60 s before it lapses, so the disc never
-// goes dark because of a stale token.
-let tokenCache = {
-  value:     null,
-  expiresAt: 0       // Unix ms
-};
+// OpenSky tokens expire after ~1 hour. We store the expiry time
+// and refresh 60 s before it lapses so the disc never goes dark.
+let tokenCache = { value: null, expiresAt: 0 };
 
 async function getToken() {
   const now = Date.now();
-
-  // Return cached token if it has more than 60 s left
-  if (tokenCache.value && now < tokenCache.expiresAt - 60_000) {
-    return tokenCache.value;
-  }
+  if (tokenCache.value && now < tokenCache.expiresAt - 60_000) return tokenCache.value;
 
   console.log("Fetching new OpenSky token…");
-
   const body = new URLSearchParams({
     grant_type:    "client_credentials",
     client_id:     creds.clientId,
     client_secret: creds.clientSecret
   });
-
   const r = await fetch(
     "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token",
-    {
-      method:  "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body
-    }
+    { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body }
   );
-
-  if (!r.ok) {
-    throw new Error(`Token fetch failed: ${r.status} ${r.statusText}`);
-  }
-
+  if (!r.ok) throw new Error(`Token fetch failed: ${r.status}`);
   const data = await r.json();
+  if (!data.access_token) throw new Error("No access_token in response");
 
-  if (!data.access_token) {
-    throw new Error("Token response contained no access_token");
-  }
-
-  // expires_in is in seconds; default to 3600 if missing
   const expiresIn = (data.expires_in || 3600) * 1000;
-
-  tokenCache = {
-    value:     data.access_token,
-    expiresAt: now + expiresIn
-  };
-
+  tokenCache = { value: data.access_token, expiresAt: now + expiresIn };
   console.log(`Token refreshed — expires in ${Math.round(expiresIn / 60000)} min`);
   return tokenCache.value;
 }
@@ -77,14 +50,8 @@ function km(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// ── Last known planes cache ───────────────────────────────
-// If OpenSky is unreachable or returns an error we send back
-// the most recent successful result tagged with `stale:true`
-// so the frontend can show "Last known positions".
-let lastKnown = {
-  planes:    [],
-  fetchedAt: null   // ISO string for logging
-};
+// ── Last-known cache ──────────────────────────────────────
+let lastKnown = { planes: [], fetchedAt: null };
 
 // ── /planes endpoint ─────────────────────────────────────
 app.get("/planes", async (req, res) => {
@@ -92,31 +59,23 @@ app.get("/planes", async (req, res) => {
   const lon    = parseFloat(req.query.lon);
   const radius = parseFloat(req.query.radius);
 
-  if (isNaN(lat) || isNaN(lon) || isNaN(radius)) {
+  if (isNaN(lat) || isNaN(lon) || isNaN(radius))
     return res.status(400).json({ error: "lat, lon and radius are required" });
-  }
 
   console.log({ lat, lon, radius });
 
   try {
     const access = await getToken();
-
     const response = await fetch(
       "https://opensky-network.org/api/states/all",
       { headers: { Authorization: `Bearer ${access}` } }
     );
 
-    // A 401 means our token was rejected — clear the cache so the
-    // next request forces a fresh token fetch instead of looping.
     if (response.status === 401) {
-      console.warn("401 from OpenSky — clearing token cache");
       tokenCache = { value: null, expiresAt: 0 };
-      throw new Error("OpenSky returned 401 — token cleared, will retry");
+      throw new Error("OpenSky 401 — token cleared");
     }
-
-    if (!response.ok) {
-      throw new Error(`OpenSky returned ${response.status}`);
-    }
+    if (!response.ok) throw new Error(`OpenSky returned ${response.status}`);
 
     const data   = await response.json();
     const nearby = [];
@@ -126,33 +85,35 @@ app.get("/planes", async (req, res) => {
       const d = km(lat, lon, p[6], p[5]);
       if (d <= radius) {
         nearby.push({
-          flight:   p[1],
-          lat:      p[6],
-          lon:      p[5],
-          distance: d,
-          heading:  p[10]
+          flight:       (p[1] || "").trim(),
+          lat:          p[6],
+          lon:          p[5],
+          distance:     Math.round(d * 10) / 10,
+          heading:      p[10],
+          // Altitude — both metres and feet
+          altitudeM:    p[7]  != null ? Math.round(p[7])           : null,
+          altitudeFt:   p[7]  != null ? Math.round(p[7] * 3.28084) : null,
+          // Speed — km/h, mph, knots
+          speedKmh:     p[9]  != null ? Math.round(p[9] * 3.6)     : null,
+          speedMph:     p[9]  != null ? Math.round(p[9] * 2.23694) : null,
+          speedKnots:   p[9]  != null ? Math.round(p[9] * 1.94384) : null,
+          // Vertical rate in ft/min (positive = climbing)
+          verticalRate: p[11] != null ? Math.round(p[11] * 196.85) : null,
+          onGround:     p[8]  || false,
+          icao:         p[0],
+          country:      p[2],
+          squawk:       p[14] || null,
         });
       }
     }
 
     console.log("Nearby:", nearby.length);
-
-    // Update the last-known cache on every successful fetch
     lastKnown = { planes: nearby, fetchedAt: new Date().toISOString() };
-
     res.json({ planes: nearby, stale: false });
 
   } catch (e) {
-    // Network down, OpenSky down, or token problem —
-    // return whatever we had last so the frontend can show
-    // "Last known positions" rather than going blank.
     console.error("Fetch error — serving last known:", e.message);
-
-    res.json({
-      planes:    lastKnown.planes,
-      stale:     true,
-      fetchedAt: lastKnown.fetchedAt
-    });
+    res.json({ planes: lastKnown.planes, stale: true, fetchedAt: lastKnown.fetchedAt });
   }
 });
 
