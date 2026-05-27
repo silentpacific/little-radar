@@ -1,6 +1,6 @@
 # Little Radar
-Version: 0.4
-Status: Browser Prototype Complete → Hardware Prototype In Progress
+Version: 0.5
+Status: Browser Prototype Active — Software Features In Progress
 
 Owner: Rahul
 
@@ -86,13 +86,41 @@ Always-on radar
 - Fallback:     Last-known positions cache on API or network failure
 - Credentials:  credentials.json (server-side only, gitignored)
 
+## API Response Shape
+
+    GET /planes?lat=&lon=&radius=
+    →
+    {
+      planes: [
+        {
+          flight:       string,
+          lat:          number,
+          lon:          number,
+          distance:     number (km),
+          heading:      number (degrees),
+          altitudeM:    number | null,
+          altitudeFt:   number | null,
+          speedKmh:     number | null,
+          speedMph:     number | null,
+          speedKnots:   number | null,
+          verticalRate: number | null (ft/min, + = climbing),
+          onGround:     boolean,
+          icao:         string,
+          country:      string,
+          squawk:       string | null,
+        }
+      ],
+      stale: boolean
+    }
+
 ## Frontend
 
 - Single file:  public/little-radar.html
-- Rendering:    Browser Canvas API
+- Rendering:    Browser Canvas API (map layer) + DOM (aircraft dots)
 - Language:     Vanilla JavaScript, no frameworks, no build step
-- Location:     Browser Geolocation API (V1 will use fixed config.json)
-- Data:         Fetches from localhost:3000/planes
+- Location:     Browser Geolocation API (watchPosition, persistent)
+- Data:         Fetches from localhost:3000/planes every 15 seconds
+- Map data:     Overpass API (roads, water, boundaries) — cached per location
 
 ## Project Structure
 
@@ -101,6 +129,7 @@ Always-on radar
     ├── package.json
     ├── package-lock.json
     ├── credentials.json        ← gitignored, never commit
+    ├── little-radar-notes.md
     └── public/
         └── little-radar.html
 
@@ -123,7 +152,8 @@ Refreshes automatically 60 seconds before expiry.
 
 If OpenSky or network fails:
 - Server returns last successful result tagged stale: true
-- Frontend shows amber banner: "Last known positions — waiting for connection"
+- Frontend handles both { planes, stale } and bare array responses
+- Amber banner: "Last known positions — waiting for connection"
 - Aircraft dots remain on screen
 - Banner clears automatically when live data resumes
 
@@ -136,9 +166,9 @@ Tested: 2 hours continuous operation confirmed stable.
 ## Desktop / large landscape (> 1200px)
 
 Radar left, fixed info panel right (260px).
-Default layout, unchanged from V0.2.
+Default layout.
 
-## Medium landscape — 1024×600 target (321–1200px landscape)
+## Medium landscape — 1024×600 target (601–1200px landscape)
 
 Radar fills left column.
 Collapsible right panel with ◀ ▶ toggle tab.
@@ -149,23 +179,124 @@ Orb resizes to fill space when panel collapses.
 
 Vertical scroll layout.
 Controls → Orb (full screen width) → Info cards below.
-No panel — everything inline.
 
-## Tiny screen — 320×240 (≤ 320px wide or ≤ 260px tall landscape)
+Note: 320×240 tiny screen layout removed in V0.4.
 
-Orb fills entire screen.
-All other UI hidden.
-Floating ⓘ button bottom-right.
-Tap opens semi-transparent overlay with aircraft count, location, list.
-✕ closes overlay.
+---
+
+# Features (Implemented)
+
+## Map layer
+
+Overpass API fetched once per location at 100 km radius.
+Cached — no re-fetch on radius change, only on location change.
+Renders: coastline, rivers, roads (major + minor), admin boundaries.
+Clipped to circular disc. Fades in on load.
+
+## Aircraft dots
+
+Dots positioned from true bearing (user → aircraft lat/lon).
+Smooth CSS transition on position update (2s linear).
+Fade in on appearance, fade out on stale/removal (30s timeout).
+Callsign + distance label on each dot.
+Label collision avoidance — greedy multi-pass nudge algorithm.
+
+## Aircraft detail panel
+
+Tap any dot or list row → right panel transforms to show:
+- Callsign
+- Distance
+- Altitude (metres and feet)
+- Speed (km/h, mph, knots)
+- Heading (degrees)
+- Vertical movement (climbing / descending / level, ft/min)
+- ICAO identifier
+- Country of registration
+- Squawk code
+
+Detail auto-refreshes on each scan.
+Detail auto-dismisses if aircraft leaves radar range.
+Tap radar background or Dismiss button to close.
+
+## Sky story message bar
+
+A slim message strip at the bottom of the radar disc.
+Fades in/out with each new message.
+Generates contextual messages from live flight data.
+
+Priority tiers:
+1. Special aircraft — RFDS, rescue helicopter, military, circling
+2. Arrivals and departures — new aircraft entering/leaving range
+3. Notable behaviour — extreme altitude, fast climb/descent, high speed
+4. Sky mood — empty sky, solo aircraft, busier/quieter than average
+5. Ambient — time of day, daily count, generic fallback
+
+Display timing:
+- Priority 1–2: 10 seconds
+- Priority 3–5: 30 seconds
+
+Cooldown logic:
+- Same message key: 5 minute cooldown before repeat
+- Same aircraft featured: 3 minute cooldown before re-narrating
+- Urgent events (RFDS, rescue, military) interrupt current message immediately
+- Regular arrivals/departures queue for next cycle
+
+Aircraft classification by callsign pattern:
+- RFDS registrations (VH-FDR, VH-IND etc.) and RFDS/CAREFLIGHT prefixes
+- Rescue / medical (RSCU, LIFE, HEMS, RESCUE, MEDIC)
+- Military / government (RAAF, ARMY, NAVY, A7, AMB, RAN)
+- Cargo / freight (FDX, UPS, DHL, TNT etc.)
+- Major airlines (QF, VA, JQ, EK, SQ, CX, MH, NZ)
+- Helicopter heuristic: speed < 200 km/h AND altitude < 1500m AND not on ground
+
+Circling detection:
+- Tracks last 4 lat/lon positions per aircraft
+- Flags as circling if total movement < ~2km across 4 consecutive scans
+
+Rolling average count:
+- 60-sample history (~15 minutes at 15s scan interval)
+- Enables "busier/quieter than usual" messages
+
+---
+
+# Features (Planned / Not Yet Built)
+
+## Aircraft persistence
+
+Target:   Aircraft fade only after 60 seconds of no update
+Status:   Approved, not built (currently 30 seconds)
+
+## Aircraft trails
+
+Target:   Store and display last 3–5 positions per aircraft, fading
+Status:   Approved, not built
+
+## Sweep illumination
+
+Target:   Radar sweep illuminates aircraft dots as it passes
+Decision: Sweep is visual only — aircraft movement remains continuous
+
+## Aircraft icon
+
+Target:   Heading-matched delta/arrow icon replacing circle dot
+Status:   Approved, not built
+
+## Day / night mode
+
+Target:   Automatic theme shift at sunrise/sunset for device location
+Status:   Approved, not built
+
+## Logging cleanup
+
+Keep:   Last scan time, aircraft count, data source status, network status
+Remove: Debug logs, developer information
+Status: Not done
 
 ---
 
 # User Experience
 
-## Startup
-
-Desired experience:
+## Startup (desired)
 
     Power
     ↓
@@ -185,7 +316,7 @@ User should never:
 - use desktop
 - manage operating system
 
-## Future startup sequence (kiosk mode)
+## Future kiosk boot sequence
 
     Power on
     ↓
@@ -205,7 +336,7 @@ User should never:
 
 ## Current prototype
 
-- Compute:   Raspberry Pi 5 (chosen for development comfort and future projects)
+- Compute:   Raspberry Pi 5
 - Display:   Official Raspberry Pi 7" touchscreen, 1024×600, landscape
 - Storage:   microSD (use Samsung Pro Endurance or SanDisk Max Endurance for always-on)
 - Power:     USB-C
@@ -214,10 +345,10 @@ User should never:
 
     ┌───────────────────────────┬──────────────┐
     │                           │              │
-    │         RADAR             │   LOGS       │
+    │         RADAR             │   PANEL      │
     │                           │              │
-    │                           │ AIRCRAFT     │
-    │                           │ LIST         │
+    │      [message bar]        │ AIRCRAFT     │
+    │                           │ LIST / DETAIL│
     └───────────────────────────┴──────────────┘
 
 ## Hardware not used
@@ -228,28 +359,34 @@ User should never:
 - Case (V1)
 - HATs
 
-## Future hardware options (V3 product)
+## Market research findings
 
-- Raspberry Pi Zero 2W (~$38 AUD) — runs existing code unchanged, cheapest Pi
-- Orange Pi Zero 2W (~$45 AUD) — 1GB RAM, USB-C power, slightly better Chromium performance
-- ESP32-S3 with built-in display (~$30 AUD) — requires full rewrite in MicroPython or C++
-- Custom PCB — V3 only, requires 12–18 months electronics work, not now
+Flight Tracker LED (flighttrackerled.com):
+- Closest commercial competitor
+- ESP32-S3 + 64×32 LED matrix + handmade maple enclosure
+- Sells at $449.99 USD
+- One person, hand-built, ships from USA
+- Started on Raspberry Pi, rebuilt on ESP32 for reliability
+- 19 verified reviews — market is real
 
-### Hardware economics (honest)
+Key insight: nobody is doing a circular radar on a proper colour screen.
+LED matrix competitors show dots and scrolling text.
+Little Radar's orb is a genuinely different and more sophisticated experience.
 
-Current BOM (Pi 5 + 7" display):   ~$640–700 AUD
-Minimum viable sale price:          ~$900–1,100 AUD
-Verdict:                            Not commercially viable at this BOM
+## Future hardware path
 
-Pi Zero 2W + 4" Waveshare display:  ~$143 AUD
-Potential sale price:               ~$200–250 AUD
-Verdict:                            Marginal but possible for V2
+V1:  Pi 5 + 7" display — current, development and personal use
+V2:  Pi Zero 2W or Orange Pi Zero 2W + 5" DSI display — ~$150 AUD BOM
+V3:  ESP32-S3 or Rockchip SoM — requires rewrite, ~$30–50 AUD BOM
 
-ESP32-S3 with display:              ~$30–50 AUD BOM
-Potential sale price:               ~$120–150 AUD
-Verdict:                            Viable — requires full rewrite
+Decision: Validate market before investing in V3 hardware.
+Method: Post a video online. See if people want to buy it.
 
-Decision: V1 is a passion project. Do not optimise for cost yet.
+### Hardware economics
+
+Current BOM (Pi 5 + 7" display):     ~$640–700 AUD → not commercially viable
+Pi Zero 2W + 5" display:              ~$150 AUD BOM → marginal
+ESP32-S3 with display:                ~$30–50 AUD BOM → viable, requires rewrite
 
 ---
 
@@ -279,7 +416,6 @@ Captive portal for WiFi setup on first boot.
 
 Preset values: 5 / 25 / 50 / 100 / 250 km
 Default: 25 km
-500 km removed — simpler UI.
 
 ---
 
@@ -292,71 +428,6 @@ Future:     .env file
 
     OPENSKY_CLIENT_ID=xxx
     OPENSKY_CLIENT_SECRET=yyy
-
----
-
-# Browser Improvements (Approved, Not Yet Built)
-
-## Aircraft persistence
-
-Target:   Aircraft fade only after 60 seconds of no update
-Status:   Approved
-
-## Aircraft trails
-
-Target:   Store and display last 5 positions per aircraft, fading from near-invisible to 44% opacity
-Status:   Built (V0.4)
-
-## Sweep illumination
-
-Target:   Radar sweep illuminates aircraft dots as it passes
-Decision: Sweep is visual only — aircraft movement remains continuous
-
-## Aircraft icon
-
-Target:   Heading-matched delta SVG silhouette replacing circle dots
-Status:   Built (V0.4)
-
-## Label collision resolution
-
-Target:   8-direction greedy placement — labels try right, left, above, below, and 4 diagonals
-Status:   Built (V0.4)
-
-## Day / Night mode
-
-Target:   Automatic light/dark theme based on sunrise/sunset at device location
-API:      sunrisesunset.io (free, no key, timezone=auto)
-Palette:  Night — existing dark green. Day — muted olive-green on warm grey.
-Status:   Built (V0.4)
-
-## Aircraft details — browser
-
-Hover to show:
-- Altitude
-- Speed
-- Direction
-- Distance
-
-## Aircraft details — hardware (touch)
-
-    Tap aircraft dot → open details panel
-    Tap list item    → highlight aircraft on radar
-    Tap outside      → return to radar
-
-Details panel replaces logs temporarily.
-Status: Approved
-
-## Logging — visible on device
-
-Keep:
-- Last scan time
-- Aircraft found
-- Data source status (live / last known)
-- Network status
-
-Remove:
-- Debug logs
-- Developer information
 
 ---
 
@@ -390,7 +461,6 @@ V2: Custom 3D printed or laser-cut acrylic.
 
 # Deployment — Manual (Current)
 
-    # On Pi or dev machine
     cd little-radar
     npm install
     node server.js
@@ -398,18 +468,24 @@ V2: Custom 3D printed or laser-cut acrylic.
     # Open in browser
     http://localhost:3000
 
+    # From another device on the same network
+    http://[PI_IP_ADDRESS]:3000
+
 ---
 
 # Testing Checklist
 
 - [ ] 1024×600 layout correct and fills screen
 - [ ] Mobile portrait layout (390×844) — orb + cards below
-- [ ] 320×240 layout — orb only + ⓘ overlay
 - [ ] Panel collapse toggle works at 1024×600
 - [ ] Auto-location works and aircraft appear
+- [ ] Aircraft detail panel opens on tap, shows all fields
+- [ ] Detail dismisses on background tap and on aircraft leaving range
+- [ ] Sky story messages appear and cycle correctly
+- [ ] RFDS / rescue / military messages interrupt immediately
 - [ ] Graceful failure when internet is off (last known banner)
 - [ ] 30 min continuous run — no memory leaks, no crashes
-- [ ] 2 hour continuous run — token refresh works ✓ (confirmed)
+- [x] 2 hour continuous run — token refresh works (confirmed)
 
 ---
 
@@ -419,41 +495,50 @@ V2: Custom 3D printed or laser-cut acrylic.
 Basic radar display. Aircraft dots. Real data.
 
 ## V0.2 — Browser prototype complete
-Responsive layouts. Panel collapse. 320×240 overlay.
-Ring labels. Sweep animation. Aircraft persistence.
+Responsive layouts. Panel collapse. Ring labels. Sweep animation.
 
-## V0.3 — Reliability update (current)
+## V0.3 — Reliability update
 Token auto-refresh with expiry tracking.
-Last-known positions fallback.
-Stale data banner.
+Last-known positions fallback with stale banner.
 2 hours continuous operation confirmed.
-Response shape updated: { planes, stale } from /planes endpoint.
+Response shape: { planes, stale }.
 
-
-## V0.4 — Aircraft Details + Visual Polish (current)
-
-Aircraft detail panel (tap dot or list row to open).
-Full flight data in API response: altitude, speed, heading, vertical rate, ICAO, country, squawk.
-Detail auto-refreshes on scan; auto-dismisses if aircraft leaves radar.
-Aircraft list rows show ✈ airborne / ⬤ on-ground glyphs.
+## V0.4 — Aircraft details + cleanup
+Full flight data in API response: altitude (m + ft), speed (km/h + mph + knots),
+heading, vertical rate (ft/min), onGround, ICAO, country, squawk.
+Aircraft detail panel — tap dot or list row.
+Detail auto-refreshes and auto-dismisses.
+Aircraft list shows ✈ / ⬤ glyphs.
 320×240 tiny screen layout removed.
 
-Heading-matched delta SVG aircraft icons replace circle dots.
-Fading position trails — last 5 positions per aircraft.
-8-direction greedy label collision resolver.
-Automatic day/night theme via sunrisesunset.io.
-All colours extracted to CSS variables.
-Radius presets: 5 / 25 / 50 / 100 / 250 km — default 25 km.
-
-
+## V0.5 — Sky story messaging (current)
+Message bar added to bottom of radar disc.
+5-priority message engine with cooldown and interruption logic.
+Aircraft classification by callsign pattern (RFDS, rescue, military, cargo, airlines).
+Helicopter heuristic detection (speed + altitude).
+Circling detection via lat/lon position history.
+Rolling aircraft count average for busy/quiet comparisons.
+Arrival and departure event detection per scan.
+Daily aircraft count tracking with midnight reset.
+Frontend handles both { planes, stale } and bare array server responses.
+Full plane data stored per dot — messaging engine reads altitude, speed, verticalRate.
 
 ---
 
 # Versioning and Repo
 
-Git repository on GitHub.
+Git repository: github.com/silentpacific/little-radar
 Development on laptop.
-Deploy to Pi via git pull or scp.
+Deploy to Pi:
+
+    ssh pi@[PI_IP]
+    cd little-radar
+    git pull
+    npm install   # only if package.json changed
+
+credentials.json is never in the repo — copy manually via scp on first deploy:
+
+    scp credentials.json pi@[PI_IP]:~/little-radar/credentials.json
 
 ---
 
@@ -467,3 +552,4 @@ Prototype is successful if:
 - feels smooth
 - touch works
 - survives 24 hours
+- message bar tells a story about the sky
