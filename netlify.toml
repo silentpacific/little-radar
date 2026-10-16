@@ -1,0 +1,9 @@
+[build]
+  publish   = "public"
+  functions = "netlify/functions"
+
+# Serve the radar at the site root
+[[redirects]]
+  from   = "/"
+  to     = "/little-radar.html"
+  status = 200
